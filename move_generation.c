@@ -53,7 +53,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool doAllM
     int        eastDelta;
     uchar      pieceType;
     uchar      boardPieces[64]   = { NO_PIECE };
-    const int color            = COLOR_TO_MOVE(position);
+    const int color              = COLOR_TO_MOVE(position);
     const bitboard vacantSquares = ~position->occupiedSquares;
     /**************************************************************************
     Determine the pieces on the board once, to save continually looking them up
@@ -90,7 +90,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool doAllM
     }
     else
     {
-        pawns            = position->pawns    & position->blackPieces;
+        pawns            = position->pawns           & position->blackPieces;
         singlePushes     = SHIFT_SOUTH(pawns)        & vacantSquares;
         doublePushes     = SHIFT_SOUTH(singlePushes) & vacantSquares & RANK_5;
         capturesWest     = SHIFT_SOUTHWEST(pawns)    & position->whitePieces;
