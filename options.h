@@ -38,13 +38,13 @@ every node in the perft test: slow
 Whether to enable null move reductions
 *******************************************************************************/
 #ifndef DO_NULL_MOVE_REDUCTION
-#define DO_NULL_MOVE_REDUCTION 1
+#define DO_NULL_MOVE_REDUCTION 0
 #endif
 /******************************************************************************
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
+#define DO_LATE_MOVE_REDUCTION 0
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static
