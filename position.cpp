@@ -60,7 +60,7 @@ static const uchar ROOK_TO_LOCATION[64] =
 Position::Position()
 {
     // VS2012 does not support C++11 delegated construction
-    Position start_pos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0");
+    Position start_pos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 17 18");
     *this = start_pos;
 }
 
@@ -100,21 +100,21 @@ Position::Position(const std::string& fen_string)
             x += c - '0';
             continue;
         }
-        std::string::size_type index = white.find(c);
-        if (index != std::string::npos)
+        std::string::size_type p = white.find(c);
+        if (p != std::string::npos)
         {
-            pieces[index + 1]  |= BITBOARD_XY(x, y);
-            white_pieces       |= BITBOARD_XY(x, y);
-            piece_on[x + 8 * y] = (uchar)(index + 1);
+            pieces[p + 1]  |= BITBOARD_XY(x, y);
+            white_pieces   |= BITBOARD_XY(x, y);
+            piece_on[x + 8 * y] = (uchar)(p + 1);
             ++x;
             continue;
         }
-        index = black.find(c);
-        if (index != std::string::npos)
+        p = black.find(c);
+        if (p != std::string::npos)
         {
-            pieces[index + 1]  |= BITBOARD_XY(x, y);
-            black_pieces       |= BITBOARD_XY(x, y);
-            piece_on[x + 8 * y] = (uchar)(index + 1);
+            pieces[p + 1]  |= BITBOARD_XY(x, y);
+            black_pieces   |= BITBOARD_XY(x, y);
+            piece_on[x + 8 * y] = (uchar)(p + 1);
             ++x;
         }
     }
@@ -154,15 +154,21 @@ Position::Position(const std::string& fen_string)
     {
         ctx.en_passant_square = ep[0] - 'a' + 8 * (ep[1] - '1');
     }
-    iss >> ctx.half_move_clock;
-    iss >> ctx.move_count;
+    iss >> x;
+    ctx.half_move_clock = (uchar)x;
+    iss >> x;
+    ctx.move_count = (uchar)x;
     ctx.king_location[WHITE] = (uchar)Lsb(kings & white_pieces);
     ctx.king_location[BLACK] = (uchar)Lsb(kings & black_pieces);
+    if (IsAttacked(ctx.king_location[ColorToMove()], ENEMY(ColorToMove())))
+    {
+        ctx.state_flags |= IS_CHECK;
+    }
 }
 
 std::string Position::ToString() const
 {
-    std::stringstream result;
+    std::ostringstream result;
     int num_empty_squares = 0;
     for (int y = 7; y >= 0; --y)
     {
@@ -233,19 +239,30 @@ std::string Position::ToString() const
     {
         result << FILE_CHAR(ctx.en_passant_square) << RANK_CHAR(ctx.en_passant_square) << ' ';
     }
-    result << ctx.half_move_clock << " mc " << ctx.move_count;
+    result << (int)ctx.half_move_clock << ' ' << (int)ctx.move_count;
     return result.str();
+}
+
+bool Position::IsLegal() const
+{
+    return 
+        HAS_SINGLE_BIT_SET(kings & white_pieces)                         &&
+        HAS_SINGLE_BIT_SET(kings & black_pieces)                         &&
+        !(KING_ATTACKS[ctx.king_location[WHITE]] & kings & black_pieces) &&
+        !IsAttacked(ctx.king_location[ENEMY(ColorToMove())], ColorToMove());
+
 }
 
 
 bool Position::MakeMove(Move move, MoveUndoCtx& undo_ctx)
 {
-    const int color       = ColorToMove();
-    const bitboard from   = BITBOARD(move.from);
-    const bitboard to     = BITBOARD(move.to);
-    const uchar piece     = piece_on[move.from];
-    undo_ctx              = ctx;
-    ctx.en_passant_square = 0; 
+    const int color         = ColorToMove();
+    const bitboard from     = BITBOARD(move.from);
+    const bitboard to       = BITBOARD(move.to);
+    const uchar piece       = piece_on[move.from];
+    undo_ctx                = ctx;
+    ctx.en_passant_square   = 0; 
+    undo_ctx.captured_piece = NO_PIECE;
     
     switch (piece)
     {

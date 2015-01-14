@@ -57,6 +57,7 @@ struct Position
     bitboard AttacksFromSquare(int location) const;
     bitboard AttacksToSquare(int location) const;
     bitboard AttacksToSquare(int location, int color) const;
+    bool IsLegal() const;
     inline int ColorToMove() const;
     inline int ColorAt(int location) const;
     inline bool IsInCheck() const;

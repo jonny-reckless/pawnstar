@@ -23,4 +23,3 @@ Function like macros
 #define SHIFT_NORTHWEST(b)          (((b) & MASK_WEST_1) << 7)
 #define ENEMY(color)                (!(color))
 #define HAS_SINGLE_BIT_SET(x)       ((x) && !((x) & ((x) - 1)))
-#define ERROR(x)                    { printf(x) ; exit(1); }

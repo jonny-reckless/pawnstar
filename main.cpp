@@ -3,10 +3,10 @@
 #include <iostream>
 
 #include "position.h"
+#include "tests_move_generation.h"
 
 int main()
 {
-    Position pos;
-    std::cout << pos.ToString() << std::endl;
+    RunPerftTests();
     return 0;
 }

@@ -5,6 +5,9 @@
 #include "generator.h"
 #include "inline_functions.h"
 
+#pragma warning(push)
+#pragma warning(disable:4127)
+
 $generator(MoveGenerator)
 {
     const Position& position;
@@ -75,22 +78,22 @@ $generator(MoveGenerator)
             targets = promotions_west;
             while (targets)
             {
-                to = FindAndClearLsb(&targets);
+                to = (uchar)FindAndClearLsb(&targets);
                 from = to - pawn_west_delta;
                 $yield(Move(from, to, promoted_piece));
             }
             targets = promotions_east;
             while (targets)
             {
-                to = FindAndClearLsb(&targets);
+                to = (uchar)FindAndClearLsb(&targets);
                 from = to - pawn_east_delta;
                 $yield(Move(from, to, promoted_piece));
             }
             targets = promotions_forward;
             while (targets)
             {
-                to = FindAndClearLsb(&targets);
-                from - to - pawn_push_delta;
+                to = (uchar)FindAndClearLsb(&targets);
+                from = to - pawn_push_delta;
                 $yield(Move(from, to, promoted_piece));
             }
         }
@@ -101,14 +104,14 @@ $generator(MoveGenerator)
         targets = position.pieces[captured_piece] & enemy_pieces;
         while (targets)
         {
-            to = FindAndClearLsb(&targets);
+            to = (uchar)FindAndClearLsb(&targets);
             attacks_to = position.AttacksToSquare(to, color);
             for (moving_piece = PAWN; moving_piece <= KING; ++moving_piece)
             {
                 sources = attacks_to & position.pieces[moving_piece];
                 while (sources)
                 {
-                    from = FindAndClearLsb(&sources);
+                    from = (uchar)FindAndClearLsb(&sources);
                     $yield(Move(from, to));
                 }
             }
@@ -117,32 +120,32 @@ $generator(MoveGenerator)
     // en passant captures
     while (pawn_captures_en_passant)
     {
-        from = FindAndClearLsb(&pawn_captures_en_passant);
+        from = (uchar)FindAndClearLsb(&pawn_captures_en_passant);
         $yield(Move(from, position.ctx.en_passant_square, MOVE_EN_PASSANT_CAPTURE));
     }
     if (do_all_moves)
     {
         // castling
-        if (!positon.IsInCheck())
+        if (!position.IsInCheck())
         {
             if (color == WHITE)
             {
-                if ((position.flags.castle_flags & MAY_WHITE_K) && !(position.occupied_squares & (F1BB | G1BB)) && !position.IsAttacked(F1, BLACK) && !position.IsAttacked(G1, BLACK))
+                if ((position.ctx.castle_flags & MAY_WHITE_K) && !(position.occupied_squares & (F1BB | G1BB)) && !position.IsAttacked(F1, BLACK) && !position.IsAttacked(G1, BLACK))
                 {
                     $yield(Move(E1, G1, MOVE_CASTLING));
                 }
-                if ((position.flags.castle_flags & MAY_WHITE_Q) && !(position.occupied_squares & (B1BB | C1BB | D1BB)) && !position.IsAttacked(D1, BLACK) && !position.IsAttacked(C1, BLACK))
+                if ((position.ctx.castle_flags & MAY_WHITE_Q) && !(position.occupied_squares & (B1BB | C1BB | D1BB)) && !position.IsAttacked(D1, BLACK) && !position.IsAttacked(C1, BLACK))
                 {
                     $yield(Move(E1, C1, MOVE_CASTLING));
                 }
             }
             else
             {
-                if ((position.flags.castle_flags & MAY_BLACK_K) && !(position.occupied_squares & (F8BB | G8BB)) && !position.IsAttacked(F8, WHITE) && !position.IsAttacked(G8, WHITE))
+                if ((position.ctx.castle_flags & MAY_BLACK_K) && !(position.occupied_squares & (F8BB | G8BB)) && !position.IsAttacked(F8, WHITE) && !position.IsAttacked(G8, WHITE))
                 {
                     $yield(Move(E8, G8, MOVE_CASTLING));
                 }
-                if ((position.flags.castle_flags & MAY_BLACK_Q) && !(position.occupied_squares & (B8BB | C8BB | D8BB)) && !position.IsAttacked(D8, WHITE) && !position.IsAttacked(C8, WHITE))
+                if ((position.ctx.castle_flags & MAY_BLACK_Q) && !(position.occupied_squares & (B8BB | C8BB | D8BB)) && !position.IsAttacked(D8, WHITE) && !position.IsAttacked(C8, WHITE))
                 {
                     $yield(Move(E8, C8, MOVE_CASTLING));
                 }
@@ -151,12 +154,12 @@ $generator(MoveGenerator)
         // pawn non captures
         while (pawn_double_pushes)
         {
-            to = FindAndClearLsb(&pawn_double_pushes);
+            to = (uchar)FindAndClearLsb(&pawn_double_pushes);
             $yield(Move(to - pawn_push_delta * 2, to));
         }
         while (pawn_single_pushes)
         {
-            to = FindAndClearLsb(&pawn_single_pushes);
+            to = (uchar)FindAndClearLsb(&pawn_single_pushes);
             $yield(Move(to - pawn_push_delta, to));
         }
         // piece non captures
@@ -165,15 +168,20 @@ $generator(MoveGenerator)
             sources = position.pieces[moving_piece] & friendly_pieces;
             while (sources)
             {
-                from = FindAndClearLsb(&sources);
+                from = (uchar)FindAndClearLsb(&sources);
                 targets = position.AttacksFromSquare(from) & ~position.occupied_squares;
                 while (targets)
                 {
-                    to = FindAndClearLsb(&targets);
+                    to = (uchar)FindAndClearLsb(&targets);
                     $yield(Move(from, to));
                 }
             }
         }
     }
     $stop;
+
+private:
+    MoveGenerator& operator=(const MoveGenerator& that);
 };
+
+#pragma warning(pop)

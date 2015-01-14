@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "bitboard_constants.h"
+#include "generated_data.h"
 
 #define INLINE static __forceinline 
 /******************************************************************************
@@ -46,7 +47,7 @@ INLINE int FindAndClearLsb(bitboard* x)
 {
     const int result = Lsb(*x);
 #if _M_X64
-    _bittestandreset64(x, result);
+    _bittestandreset64((__int64*)x, result);
 #else
     *x &= *x - 1;
 #endif
