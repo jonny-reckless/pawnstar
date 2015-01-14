@@ -5,8 +5,9 @@
 
 #include "types.h"
 #include "move.h"
+#include "macros.h"
 
-struct PositionFlags
+struct MoveUndoCtx
 {    
     uchar   castle_flags;    
     uchar   state_flags;     
@@ -43,26 +44,36 @@ struct Position
         };
     };
     uchar           piece_on[64];   
-    PositionFlags   flags;
+    MoveUndoCtx     ctx;
 
     Position();
     Position(const std::string& fen_string);
     Position(const Position& that);
     Position& operator=(const Position& that);
 
-    bool MakeMove(Move move, PositionFlags& flags);
-    void UndoMove(Move move, const PositionFlags& flags);  
+    bool MakeMove(Move move, MoveUndoCtx& undo_ctx);
+    void UndoMove(Move move, const MoveUndoCtx& undo_ctx);  
     bool IsAttacked(int location, int color) const;
     bitboard AttacksFromSquare(int location) const;
     bitboard AttacksToSquare(int location) const;
-
-    int ColorToMove() const
-    {
-        return flags.state_flags & IS_BLACK_TO_MOVE ? BLACK : WHITE;
-    }
-
-    bool IsInCheck() const
-    {
-        return !!(flags.state_flags & IS_CHECK);
-    }
+    bitboard AttacksToSquare(int location, int color) const;
+    inline int ColorToMove() const;
+    inline int ColorAt(int location) const;
+    inline bool IsInCheck() const;
+    std::string ToString() const;
 };
+
+inline int Position::ColorToMove() const
+{
+    return ctx.state_flags & IS_BLACK_TO_MOVE ? BLACK : WHITE;
+}
+
+inline int Position::ColorAt(int location) const
+{
+    return BITBOARD(location) & white_pieces ? WHITE : BITBOARD(location) & black_pieces ? BLACK : NEITHER_COLOR;
+}
+
+inline bool Position::IsInCheck() const
+{
+    return !!(ctx.state_flags & IS_CHECK);
+}

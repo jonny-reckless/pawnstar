@@ -3,7 +3,7 @@
 // generator/continuation for C++
 // author: Andrew Fedoniouk @ terrainformatica.com
 // idea borrowed from: "coroutines in C" Simon Tatham,
-//   http://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
+// http://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
 
 struct _generator
 {

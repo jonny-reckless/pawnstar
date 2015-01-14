@@ -23,8 +23,4 @@ Function like macros
 #define SHIFT_NORTHWEST(b)          (((b) & MASK_WEST_1) << 7)
 #define ENEMY(color)                (!(color))
 #define HAS_SINGLE_BIT_SET(x)       ((x) && !((x) & ((x) - 1)))
-#define COLOR_TO_MOVE(position)     ((position)->flags.state_flags & IS_BLACK_TO_MOVE ? BLACK : WHITE)
-#define COLOR_NOT_TO_MOVE(position) ((position)->flags.state_flags & IS_BLACK_TO_MOVE ? WHITE : BLACK)
-#define COLOR_AT(position, location)((BITBOARD(location) & (position)->white_pieces) ? WHITE : \
-                                    ( BITBOARD(location) & (position)->black_pieces) ? BLACK : NEITHER_COLOR)
 #define ERROR(x)                    { printf(x) ; exit(1); }
