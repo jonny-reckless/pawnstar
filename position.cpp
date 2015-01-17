@@ -60,7 +60,7 @@ static const uchar ROOK_TO_LOCATION[64] =
 Position::Position()
 {
     // VS2012 does not support C++11 delegated construction
-    Position start_pos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 17 18");
+    Position start_pos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     *this = start_pos;
 }
 
@@ -85,8 +85,8 @@ Position::Position(const std::string& fen_string)
     std::string board_description;
     iss >> board_description;
     int x = 0, y = 7;
-    const std::string white = "PNBRQK";
-    const std::string black = "pnbrqk";
+    static const std::string white = "PNBRQK";
+    static const std::string black = "pnbrqk";
     for (char c : board_description)
     {
         if (c == '/')
@@ -136,12 +136,13 @@ Position::Position(const std::string& fen_string)
         case 'K':
             ctx.castle_flags |= MAY_WHITE_K;
             break;
-        case 'k':
-            ctx.castle_flags |= MAY_BLACK_K;
-            break;
         case 'Q':
             ctx.castle_flags |= MAY_WHITE_Q;
             break;
+        case 'k':
+            ctx.castle_flags |= MAY_BLACK_K;
+            break;
+        
         case 'q':
             ctx.castle_flags |= MAY_BLACK_Q;
             break;
@@ -253,16 +254,15 @@ bool Position::IsLegal() const
 
 }
 
-
 bool Position::MakeMove(Move move, MoveUndoCtx& undo_ctx)
 {
     const int color         = ColorToMove();
     const bitboard from     = BITBOARD(move.from);
     const bitboard to       = BITBOARD(move.to);
     const uchar piece       = piece_on[move.from];
-    undo_ctx                = ctx;
-    ctx.en_passant_square   = 0; 
+    undo_ctx                = ctx;   
     undo_ctx.captured_piece = NO_PIECE;
+    ctx.en_passant_square   = 0;
     
     switch (piece)
     {
@@ -435,6 +435,7 @@ void Position::UndoMove(Move move, const MoveUndoCtx& undo_ctx)
             break;
         }
     }
+    occupied_squares = white_pieces | black_pieces;
     ctx = undo_ctx;
 }
 
@@ -567,3 +568,4 @@ bitboard Position::AttacksToSquare(int location, int color) const
     }
     return attackers;
 }
+
