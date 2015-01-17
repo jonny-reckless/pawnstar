@@ -1,9 +1,11 @@
 #pragma once
 
+#include "bitboard_constants.h"
+#include "macros.h"
 #include "types.h"
-#include "position.h"
-#include "generator.h"
 #include "inline_functions.h"
+#include "generator.h"
+#include "position.h"
 
 #pragma warning(push)
 #pragma warning(disable:4127)
@@ -24,6 +26,7 @@ $generator(MoveGenerator)
     bitboard        targets;
     bitboard        sources;
     bitboard        attacks_to;
+    bitboard        seventh_rank;
     signed char     pawn_push_delta;
     signed char     pawn_west_delta;
     signed char     pawn_east_delta;
@@ -49,7 +52,8 @@ $generator(MoveGenerator)
             pawn_captures_en_passant = position.ctx.en_passant_square ? PAWN_ATTACKS_BLACK[position.ctx.en_passant_square] & pawns : NO_SQUARES;
             promotions_forward       = pawn_single_pushes & RANK_8;
             promotions_west          = SHIFT_NORTHWEST(pawns) & position.black_pieces & RANK_8;
-            promotions_east          = SHIFT_NORTHEAST(pawns) & position.black_pieces & RANK_8;       
+            promotions_east          = SHIFT_NORTHEAST(pawns) & position.black_pieces & RANK_8;     
+            seventh_rank             = RANK_7;
         }
         else
         {
@@ -63,6 +67,7 @@ $generator(MoveGenerator)
             promotions_forward       = pawn_single_pushes & RANK_1;
             promotions_west          = SHIFT_SOUTHWEST(pawns) & position.white_pieces & RANK_1;
             promotions_east          = SHIFT_SOUTHEAST(pawns) & position.white_pieces & RANK_1;
+            seventh_rank             = RANK_2;
         }
         pawn_single_pushes ^= promotions_forward;
     }
@@ -106,7 +111,13 @@ $generator(MoveGenerator)
         {
             to = (uchar)FindAndClearLsb(&targets);
             attacks_to = position.AttacksToSquare(to, color);
-            for (moving_piece = PAWN; moving_piece <= KING; ++moving_piece)
+            sources = attacks_to & position.pawns & ~seventh_rank;
+            while (sources)
+            {
+                from = (uchar)FindAndClearLsb(&sources);
+                $yield(Move(from, to));
+            }
+            for (moving_piece = KNIGHT; moving_piece <= KING; ++moving_piece)
             {
                 sources = attacks_to & position.pieces[moving_piece];
                 while (sources)

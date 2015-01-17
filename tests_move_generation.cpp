@@ -30,7 +30,7 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 *******************************************************************************/
-/*
+
 static const PerftTest PERFT_TESTS[] =
 {//    position                                                          depth        nodes   captures      ep   castles promotions   checks
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                6, { 119060324,   2812008,   5248,        0,        0,   809099 } },
@@ -40,7 +40,7 @@ static const PerftTest PERFT_TESTS[] =
     { "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq -",           3, {     53392,      4381,     75,      969,        0,     2269 } },
     { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 5, { 164075551,  19528068,    122,        0,        0,  2998608 } },
 };
-*/
+/*
 static const PerftTest PERFT_TESTS[] =
 {//    position                                                          depth        nodes   captures      ep   castles promotions   checks
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                4, { 119060324,   2812008,   5248,        0,        0,   809099 } },
@@ -50,6 +50,7 @@ static const PerftTest PERFT_TESTS[] =
     { "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq -",           4, {     53392,      4381,     75,      969,        0,     2269 } },
     { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 4, { 164075551,  19528068,    122,        0,        0,  2998608 } },
 };
+*/
 /******************************************************************************
 Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
