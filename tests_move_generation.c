@@ -89,7 +89,7 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
 {
     static int call_count = 0;
     int moves[MAX_MOVES_PER_POSITION];
-#if 0
+#if 1
     MoveGenerator gen;
     int* m = moves;
     int move;
