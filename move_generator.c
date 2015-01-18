@@ -45,10 +45,10 @@ void InitMoveGen(MoveGenerator* gen, const Position* position, bool do_all_moves
         gen->promotions_east          = SHIFT_SOUTHEAST(pawns) & position->white_pieces & RANK_1;
         gen->seventh_rank             = RANK_2;
     }
-    gen->pawn_single_pushes ^= gen->promotions_forward;
+    gen->pawn_single_pushes ^= gen->promotions_forward; /* don't do promotional pushes twice */
 }
 /******************************************************************************
-Move generator to yield moves one by one in a plausible best first sequence:
+Move generator to yield moves one-by-one in a plausible best first order:
 
 1) Capturing pawn promotions
 2) Non capturing pawn promotions
@@ -62,7 +62,7 @@ If generating all moves:
 7) Single pawn pushes
 8) Non capturing piece moves, in ascending piece value order
 
-NB: Since this is a resumable generator function, there must be no locals on 
+NB: Since this is a resumable generator function, there are no locals on 
 the stack: all variables are contained within the MoveGenerator structure.
 *******************************************************************************/
 int NextMove(MoveGenerator* gen)
@@ -193,7 +193,7 @@ int NextMove(MoveGenerator* gen)
             }
         }
     }
-    YIELD(0); /* zero terminates move sequence */
+    YIELD(0); /* terminates move sequence */
     GENERATOR_END;
     return 0;
 }
