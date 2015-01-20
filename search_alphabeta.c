@@ -208,6 +208,10 @@ int Search(const Position* src_position,
             RecordGoodMove(ply, move);            
         }
     }
+    if (!is_transposition && depth > 1)
+    {
+        INCREMENT("nodes without transposition");
+    }
     GeneratePseudoLegalMoves(src_position, moves, true);
     SortMoves(moves, ply);
     /**************************************************************************
