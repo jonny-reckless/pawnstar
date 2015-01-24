@@ -103,15 +103,15 @@ int SearchRootNode(const Position* src_position)
         MergeSort(move_count, scored_moves);
         for (i = 0; i != move_count; ++i)
         {
-            scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, &cancel);
+            scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
             if (cancel)
             {
                 return best_move;
             }
             if (scored_moves[i].score > alpha)
             {
-                alpha                                = scored_moves[i].score;
-                best_move                             = scored_moves[i].move;
+                alpha                                    = scored_moves[i].score;
+                best_move                                = scored_moves[i].move;
                 best_move_at_each_iteration[depth].move  = scored_moves[i].move;
                 best_move_at_each_iteration[depth].score = scored_moves[i].score;
                 RecordGoodMove(0, scored_moves[i].move);
@@ -140,7 +140,7 @@ int SearchRootNode(const Position* src_position)
         if (globals->time_control.clock_type == STANDARD_CHESS_CLOCK || 
             globals->time_control.clock_type == INCREMENTAL_CLOCK)
         {
-            const int elapsedms = stop_time - start_time;
+            const int elapsed_ms = stop_time - start_time;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
             for (i = 1; i != depth; ++i)
@@ -154,15 +154,15 @@ int SearchRootNode(const Position* src_position)
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsedms * 9) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 9) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsedms * 3) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
             {
                 break;
             }
-            if (elapsedms > ms_allocated)
+            if (elapsed_ms > ms_allocated)
             {
                 break;
             }

@@ -10,11 +10,11 @@ int SearchQuiescent(const Position* src_position,
                     int beta, 
                     volatile bool* cancel)
 {
-    int     i;   
-    int     moves[MAX_MOVES_PER_POSITION];
-    int     move;
-    int     score;
-    bool    is_first_move = true;
+    int         moves[MAX_MOVES_PER_POSITION];
+    const int*  pmove = moves;
+    int         move;
+    int         score;
+    bool        is_first_move = true;
     
     INCREMENT("quiescent calls");
     if (*cancel)
@@ -50,7 +50,7 @@ int SearchQuiescent(const Position* src_position,
     /**************************************************************************
     Main loop
     ***************************************************************************/
-    for (i = 0; (move = moves[i]) != 0; ++i)
+    while ((move = *pmove++) != 0)
     {
         Position position[1];
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL

@@ -90,7 +90,8 @@ void DoSomethingUseful(void)
             task->alpha, 
             task->beta, 
             task->move, 
-            task->move_index, 
+            task->move_index,
+            false,
             &task->cancel);
     }
     else

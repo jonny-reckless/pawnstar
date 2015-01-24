@@ -20,7 +20,7 @@ Search
 *******************************************************************************/
 int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index, volatile bool* cancel);
+int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index, bool is_deferred_move, volatile bool* cancel);
 SearchTask* NewSearchTask   (const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index);
 int         SearchRootNode  (const Position* position);
 /******************************************************************************
@@ -85,6 +85,7 @@ Generation and ordering of moves
 *******************************************************************************/
 void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, int move);
+bool        HasMoveBeenGood(int ply, int move);
 int         GenerateLegalMoves(const Position* position, int moves[]);
 int*        GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all_moves);
 int         EvaluateStaticExchange(const Position* src_position, int move);

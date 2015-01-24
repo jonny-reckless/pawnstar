@@ -39,6 +39,11 @@ void RecordGoodMove(int ply, int move)
 {
     _InterlockedIncrement(&good_move_counts[ply][move & MOVE_MASK]);
 }
+
+bool HasMoveBeenGood(int ply, int move)
+{
+    return !!good_move_counts[ply][move & MOVE_MASK];
+}
 /******************************************************************************
 The valuable move counts table is reset before the start of each search.
 *******************************************************************************/

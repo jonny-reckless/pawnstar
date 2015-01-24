@@ -1,4 +1,5 @@
 #include "pawnstar.h"
+#pragma warning(disable:4221)
 /******************************************************************************
 Main search routine: fail-hard alpha beta
 Refer to:
@@ -12,15 +13,18 @@ int Search(const Position* src_position,
            int beta, 
            volatile bool* cancel)
 {
-    int             i;
     Transposition   transposition[1];
     int             move;   
     int             moves[MAX_MOVES_PER_POSITION];
-    int             score;
-    int             legal_move_count  = 0;      
-    int             best_move        = 0;
-    bool            have_raised_alpha = false;
+    int             deferred_moves[MAX_MOVES_PER_POSITION];    
+    int             score;   
     bool            is_transposition;
+    int*            deferred_move     = deferred_moves;
+    int             num_legal_moves   = 0;      
+    int             best_move         = 0;
+    bool            have_raised_alpha = false;
+    const int*      move_types[3]     = { moves, deferred_moves, NULL };
+    const int**     move_type;
 
     if (*cancel)
     {
@@ -127,14 +131,14 @@ int Search(const Position* src_position,
     # we have at least 4 pieces remaining
     # the material eval score is high enough for a beta cutoff 
     ***************************************************************************/
-    if (!(src_position->state_flags & IS_CHECK)  &&
-        ply != 0                               &&
+    if (!(src_position->state_flags & IS_CHECK) &&
+        ply != 0                                &&
         src_position->move)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
-            PopCount(friendly_pieces) > 4           && 
-            EvaluateMaterial(src_position) >= beta)
+            PopCount(friendly_pieces) > 4            && 
+            EvaluatePosition(src_position, alpha, beta) >= beta)
         {
             Position position[1];
             INCREMENT("null move attempts");
@@ -159,7 +163,7 @@ int Search(const Position* src_position,
     if ((move = GetPrincipalVariationMove(src_position->hash)) != 0)
     {
         INCREMENT("pv table move");
-        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, cancel);
+        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, false, cancel);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -187,7 +191,7 @@ int Search(const Position* src_position,
     {
         INCREMENT("table move");
         move = transposition->move;
-        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, cancel);
+        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, false, cancel);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -217,38 +221,51 @@ int Search(const Position* src_position,
     /**************************************************************************
     Start of main loop
     ***************************************************************************/
-    for (i = 0; (move = moves[i]) != 0; ++i)
-    {       
-        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, legal_move_count, cancel);
-        if (*cancel)
+    for (move_type = move_types; *move_type; ++move_type)
+    {
+        const int* these_moves = *move_type;
+        const bool is_deferred = (these_moves == deferred_moves);
+        while ((move = *these_moves++) != 0)
         {
-            return ILLEGAL_SCORE;
+            if (!is_deferred && EvaluateStaticExchange(src_position, move) < 0)
+            {
+                /* defer moves with a negative static exchange */
+                *deferred_move++ = move;
+                INCREMENT("deferred moves");
+                continue;
+            }
+            score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, num_legal_moves, is_deferred, cancel);
+            if (*cancel)
+            {
+                return ILLEGAL_SCORE;
+            }
+            if (score == MOVED_INTO_CHECK_SCORE)
+            {
+                continue;
+            }
+            ++num_legal_moves;
+            if (score >= beta)
+            {
+                INCREMENT("beta cutoffs");
+                RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
+                RecordGoodMove(ply, move);
+                return beta;
+            }
+            if (score > alpha)
+            {
+                INCREMENT("pv changed");
+                have_raised_alpha = true;
+                best_move = move;
+                alpha = score;
+                RecordGoodMove(ply, move);
+            }
         }
-        if (score == MOVED_INTO_CHECK_SCORE)
-        {
-            continue;
-        }
-        ++legal_move_count;
-        if (score >= beta)
-        {
-            INCREMENT("beta cutoffs");
-            RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
-            RecordGoodMove(ply, move);
-            return beta;
-        }
-        if (score > alpha)
-        {
-            INCREMENT("pv changed");
-            have_raised_alpha = true;
-            best_move = move;
-            alpha = score;
-            RecordGoodMove(ply, move);            
-        }
-    }
+        *deferred_move = 0; /* terminate deferred moves list */
+    }    
     /**************************************************************************
     End of main loop: we have searched all moves and did not get a cutoff.
     ***************************************************************************/
-    if (legal_move_count == 0)
+    if (num_legal_moves == 0)
     {
         /**********************************************************************
         We failed to find any strictly legal moves from this position.
@@ -265,8 +282,7 @@ int Search(const Position* src_position,
         }
         INCREMENT("stalemates");
         return DRAW_SCORE;
-    }  
-    
+    }     
     if (have_raised_alpha)
     {
         /**********************************************************************
@@ -296,7 +312,8 @@ int SearchSingleMove(const Position* src_position,
                      int alpha, 
                      int beta, 
                      int move, 
-                     int move_index, 
+                     int move_index,
+                     bool is_deferred_move,
                      volatile bool* cancel)
 {
     static const int SEVENTH_RANK[2] = { 6, 1 };
@@ -319,11 +336,10 @@ int SearchSingleMove(const Position* src_position,
     # This is a pawn push to the 7th rank
     
     Reduce the search depth if ALL of the following are true:
-    # We are not in check
-    # Search depth is greater than or equal to 3
-    # This move does not give check
-    # The move was not from the PV or TT
-    # This move does not have a positive static exchange evaluation
+    # The move was deferred due to negative SEE
+    # Search depth is greater than or equal to 3      
+    # The move is not a capture
+    # The move does not give check 
     *******************************************************************/
     if (src_position->state_flags & IS_CHECK)
     {
@@ -342,19 +358,19 @@ int SearchSingleMove(const Position* src_position,
         child_depth = depth;
     }
 #if DO_LATE_MOVE_REDUCTION
-    else if (depth < 3                         || 
-             move_index == 0                    ||
-             (position->state_flags & IS_CHECK) ||
-             src_position->move == 0            ||
-             EvaluateStaticExchange(src_position, move) >= 0)
-    {
-        INCREMENT("extensions none (normal search depth)");
-        child_depth = depth - 1;
-    }
-    else
+    else if (is_deferred_move     &&
+             depth >= 3           &&
+             !MOVE_CAPTURED(move) &&
+             !(position->state_flags & IS_CHECK) &&
+             !HasMoveBeenGood(ply, move))
     {
         INCREMENT("extensions reduce LMR");
         child_depth = depth - 2;
+    }
+    else
+    {
+        INCREMENT("extensions none (normal search depth)");
+        child_depth = depth - 1;
     }
 #else
     else
@@ -390,4 +406,5 @@ int SearchSingleMove(const Position* src_position,
     }
 #endif
     return score;
+    is_deferred_move;
 }
