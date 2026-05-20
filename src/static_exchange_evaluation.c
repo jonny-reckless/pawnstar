@@ -3,6 +3,8 @@
 #include "generated_data.h"
 #include "position.h"
 
+#include <string.h>
+
 static const int SEE_VALUES[7] = {0, 100, 300, 300, 500, 900, 10000};
 
 typedef struct
@@ -137,14 +139,10 @@ see_result_t evaluate_static_exchange(const position_t *src_position, move_t mov
     position_t dst_position = position_make_move(src_position, move);
     const bool is_checking  = position_is_in_check(&dst_position);
 
-    see_board_t bb = {
-        position_pawns(&dst_position),        position_knights(&dst_position),      position_bishops(&dst_position),
-        position_rooks(&dst_position),        position_queens(&dst_position),       position_kings(&dst_position),
-        position_white_pieces(&dst_position), position_black_pieces(&dst_position),
-    };
-
-    const piece_t piece    = position_piece_at(src_position, move_from(move));
-    const piece_t captured = move_type(move) == MOVE_EP_CAPTURE ? PAWN : position_piece_at(src_position, move_to(move));
+    see_board_t bb;
+    memcpy(&bb, &dst_position, sizeof(see_board_t));
+    const piece_t piece    = move_piece(move);
+    const piece_t captured = move_captured(move);
     const piece_t promoted = move_promoted(move);
     if (promoted != NONE)
     {

@@ -9,7 +9,6 @@ GENERATOR_EXE       = generate_constants/gen_constants
 OBJECTS             = $(addprefix $(BUILD_DIR)/, $(SOURCES:.c=.o))
 DEPS                = $(OBJECTS:.o=.d)
 SOURCES             = \
-	bitboard.c \
 	castling_rights.c \
 	chess_clock.c \
 	history_table.c \

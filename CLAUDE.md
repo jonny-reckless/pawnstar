@@ -4,48 +4,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build
 
-Requires `clang++` and GNU `make`. The build has a pre-compilation step that generates `src/generated_data.cpp` (precomputed bitboard lookup tables).
+Requires `clang` and GNU `make`. The build has a pre-compilation step that generates `src/generated_data.c` (precomputed bitboard lookup tables and Zobrist hashes).
 
 ```bash
-make          # full build → build/pawnstar
-make clean    # remove build artifacts
+make           # release build → build/pawnstar
+make DEBUG=1   # debug build with ASan + UBSan (-Og)
+make clean     # remove build artifacts
 ```
 
-Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c++20`, and `-I include`. Debug builds use `-fsanitize=undefined,address`.
+Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c17`, `-I include`, and `-D _POSIX_C_SOURCE=200809L`. Debug builds add `-fsanitize=undefined,address`.
 
 ## Running Tests
 
-All tests run inside the engine via UCI-style commands. Build first, then:
+Tests are embedded as engine commands. Build first, then:
 
 ```bash
 ./build/pawnstar
 perft          # move generation regression suite (standard PERFT positions)
+perft x        # same, with cross-validation against an independent pseudo-legal generator
 seetests       # static exchange evaluation tests
-postests 9     # Bratko-Kopec search positions at depth 9
+postests 9     # Bratko-Kopec search positions at depth 9 (default depth is 9)
 ```
 
-There is no separate test binary or unit test framework — tests are embedded as engine commands.
+There is no separate test binary or unit test framework.
 
 ## Code Formatting
 
 clang-format with Microsoft base style, 120-column limit. Config is in `.clang-format`.
 
+## Documentation
+
+```bash
+doxygen .      # generates HTML docs; Doxyfile is in the repo root
+```
+
+All public types and functions have Doxygen comments (`/// @brief`, `///<`).
+
 ## Architecture
 
-Pawnstar is a UCI chess engine using bitboard board representation and alpha-beta search.
+Pawnstar is a UCI chess engine written in **C17** using bitboard board representation and alpha-beta search.
 
-**Board representation** — `Position` ([position.h](include/position.h)) is the central state class. It holds per-piece and per-color bitboards, a square→piece array for O(1) lookup, Zobrist hash, castling rights, and en passant square. `Bitboard` ([bitboard.h](include/bitboard.h)) provides the 64-bit set operations.
+**Naming conventions** — types are `lower_snake_case_t`, functions are `type_verb` or `type_verb_noun` (e.g. `position_make_move`, `move_list_push_back`), constants and macros are `UPPER_SNAKE_CASE`. One logical module per `.h`/`.c` pair; inline functions live in the header.
 
-**Move encoding** — `Move` ([move.h](include/move.h)) packs from/to squares, moving piece, captured piece, move type flags (castling, en passant, promotion, double push, check), and a sort score into 64 bits. `MoveList` / `StackList` are fixed-capacity stack vectors with no heap allocation during search.
+**Board representation** — `position_t` ([include/position.h](include/position.h)) holds six per-piece bitboards, two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, and en-passant square. `bitboard_t` is a `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8). The `BB_FOREACH` macro iterates set bits LSB-first.
 
-**Attack generation** — `Attacks` ([attacks.h](include/attacks.h)) uses BMI2 `_pext_u64` for sliding-piece attacks via precomputed occupancy masks. The lookup tables live in `src/generated_data.cpp` (generated at build time). Knight, king, and pawn attack tables are also precomputed. `Pins` ([pins.h](include/pins.h)) computes pin rays and absolute pins before move generation.
+**Move encoding** — `move_t` is a `typedef int64_t` packing from/to squares (bits 0–11), moving piece (12–14), captured piece (15–17), move type flags (18–21), gives-check flag (22), and sort score (32–63). `move_list_t` and `variation_list_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
 
-**Search** — `Game` ([game.h](include/game.h), [game.cpp](src/game.cpp)) owns the transposition tables, history table, opening book, chess clock, and position history stack. It drives iterative deepening via `SearchRootNode` ([search_root_node.cpp](src/search_root_node.cpp)). The alpha-beta implementation is in [search_alphabeta.cpp](src/search_alphabeta.cpp) with a separate quiescence search in [search_quiescent.cpp](src/search_quiescent.cpp). Search runs on a worker thread so UCI `stop` can interrupt it.
+**Attack generation** — `bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks. The lookup tables live in `src/generated_data.c`. `Pins` ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation.
 
-**Transposition table** — Two tables: 64 MB for the main search, 8 MB for quiescence. Entries store hash, best move, score, depth, node type (CUT/ALL/PV), and an age flag for replacement policy.
+**Search** — `game_t` ([include/game.h](include/game.h)) owns all search state: two transposition tables (64 MB main, 8 MB quiescence), a history heuristic table, opening book, chess clock, and position history stack for repetition detection. Search runs on a `thrd_t` worker thread so UCI `stop` can interrupt it.
 
-**Evaluation** — `Evaluation` ([evaluation.h](include/evaluation.h), [evaluation.cpp](src/evaluation.cpp)) scores material, piece-square tables, pawn structure (doubled/isolated/passed), and king safety. Scores are tapered between opening/middlegame and endgame phases. SEE ([static_exchange_evaluation.h](include/static_exchange_evaluation.h)) is used for move ordering of captures.
+The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)) uses iterative deepening from depth 3, PVS (principal variation search), null-move pruning, late-move reduction (LMR after the 3rd move at depth > 2 in non-PV nodes), and check/promotion/en-passant extensions. Move ordering: TT move first, then MVV-LVA combined with the history heuristic.
 
-**UCI protocol** — [input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics (`eval`, `getboard`, `dbg`) and the test commands above.
+**Evaluation** — `evaluate_position` ([src/evaluation.c](src/evaluation.c)) scores material, piece-square tables (tapered between opening and endgame phases), pawn structure (passed, isolated, backward, doubled, defended), mobility, and king safety (pawn shelter, attacking pieces near the king).
 
-**Generated data** — [generate_constants/](generate_constants/) is a standalone program that outputs [src/generated_data.cpp](src/generated_data.cpp). Regenerate only when attack mask logic changes; the output is committed to the repo.
+**Opening book** — loaded from a plain-text file; positions are sorted by Zobrist hash at load time; runtime lookup is O(log n) via `bsearch`. Move selection uses a xorshift64 PRNG.
+
+**Generated data** — [generate_constants/](generate_constants/) is a standalone C program that writes [src/generated_data.c](src/generated_data.c). Its output is committed; regenerate only when attack-mask logic changes (`make gen` builds the generator).
+
+**UCI diagnostics** — beyond the standard UCI command set, the engine accepts `eval`, `getboard`, `bookmoves`, `freebook`, `dbg`, `dbgclear`, and `help`. See [src/input_handling.c](src/input_handling.c).

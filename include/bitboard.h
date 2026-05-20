@@ -106,13 +106,6 @@ static inline bitboard_t bitboard_shift_northwest(bitboard_t b)
 }
 
 // ---------------------------------------------------------------------------
-// Debug
-// ---------------------------------------------------------------------------
-
-/// @brief Write an 8×8 ASCII board representation of @p b into @p buf (at least 200 bytes).
-void bitboard_to_string(bitboard_t b, char *buf, size_t buf_size);
-
-// ---------------------------------------------------------------------------
 // Iteration macro
 // ---------------------------------------------------------------------------
 
@@ -126,17 +119,16 @@ void bitboard_to_string(bitboard_t b, char *buf, size_t buf_size);
 // Common bitboard constants
 // ---------------------------------------------------------------------------
 
-// clang-format off
 static const bitboard_t NO_SQUARES    = 0x0000000000000000ull; ///< Empty board.
 static const bitboard_t ALL_SQUARES   = 0xFFFFFFFFFFFFFFFFull; ///< All 64 squares.
-static const bitboard_t RANK1        = 0x00000000000000FFull; ///< Squares a1–h1.
-static const bitboard_t RANK2        = 0x000000000000FF00ull; ///< Squares a2–h2.
-static const bitboard_t RANK3        = 0x0000000000FF0000ull; ///< Squares a3–h3.
-static const bitboard_t RANK4        = 0x00000000FF000000ull; ///< Squares a4–h4.
-static const bitboard_t RANK5        = 0x000000FF00000000ull; ///< Squares a5–h5.
-static const bitboard_t RANK6        = 0x0000FF0000000000ull; ///< Squares a6–h6.
-static const bitboard_t RANK7        = 0x00FF000000000000ull; ///< Squares a7–h7.
-static const bitboard_t RANK8        = 0xFF00000000000000ull; ///< Squares a8–h8.
+static const bitboard_t RANK1         = 0x00000000000000FFull; ///< Squares a1–h1.
+static const bitboard_t RANK2         = 0x000000000000FF00ull; ///< Squares a2–h2.
+static const bitboard_t RANK3         = 0x0000000000FF0000ull; ///< Squares a3–h3.
+static const bitboard_t RANK4         = 0x00000000FF000000ull; ///< Squares a4–h4.
+static const bitboard_t RANK5         = 0x000000FF00000000ull; ///< Squares a5–h5.
+static const bitboard_t RANK6         = 0x0000FF0000000000ull; ///< Squares a6–h6.
+static const bitboard_t RANK7         = 0x00FF000000000000ull; ///< Squares a7–h7.
+static const bitboard_t RANK8         = 0xFF00000000000000ull; ///< Squares a8–h8.
 static const bitboard_t FILE_A        = 0x0101010101010101ull; ///< Squares a1–a8.
 static const bitboard_t FILE_B        = 0x0202020202020202ull; ///< Squares b1–b8.
 static const bitboard_t FILE_C        = 0x0404040404040404ull; ///< Squares c1–c8.
@@ -147,4 +139,3 @@ static const bitboard_t FILE_G        = 0x4040404040404040ull; ///< Squares g1�
 static const bitboard_t FILE_H        = 0x8080808080808080ull; ///< Squares h1–h8.
 static const bitboard_t WHITE_SQUARES = 0x55AA55AA55AA55AAull; ///< All light squares.
 static const bitboard_t BLACK_SQUARES = 0xAA55AA55AA55AA55ull; ///< All dark squares.
-// clang-format on

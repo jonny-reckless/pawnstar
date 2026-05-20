@@ -24,7 +24,8 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         return search(game, depth, ply, alpha, beta, &dummy);
     }
 
-    const zobrist_t hash = position_hash(game_current_position(game));
+    const zobrist_t hash = game_current_position(game)->hash;
+
     transposition_t transposition;
     bool            has_transposition = transposition_table_find(&game->quiescent_table, hash, &transposition);
     if (has_transposition && transposition.score >= beta)

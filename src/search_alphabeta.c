@@ -123,8 +123,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
 
     // transposition_t table lookup.
     transposition_t transposition;
-    bool            has_transposition =
-        transposition_table_find(&game->transposition_table, position_hash(position), &transposition);
+    bool has_transposition = transposition_table_find(&game->transposition_table, position->hash, &transposition);
     if (has_transposition && transposition.depth >= depth)
     {
         switch ((transposition_node_type_t)transposition.node_type)
@@ -187,7 +186,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            transposition_t rec = {position_hash(game_current_position(game)),
+            transposition_t rec = {game_current_position(game)->hash,
                                    transposition.move,
                                    score,
                                    (int16_t)depth,
@@ -257,12 +256,8 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            transposition_t rec = {position_hash(game_current_position(game)),
-                                   move,
-                                   score,
-                                   (int16_t)depth,
-                                   (uint8_t)TRANSPOSITION_CUT,
-                                   false};
+            transposition_t rec = {game_current_position(game)->hash, move, score, (int16_t)depth,
+                                   (uint8_t)TRANSPOSITION_CUT,        false};
             transposition_table_record(&game->transposition_table, &rec);
             history_table_record_good_move(&game->history_table, ply, move);
             return score;
@@ -282,7 +277,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         }
     }
 
-    const zobrist_t pos_hash = position_hash(game_current_position(game));
+    const zobrist_t pos_hash = game_current_position(game)->hash;
     if (has_raised_alpha)
     {
         INCREMENT("pv nodes");

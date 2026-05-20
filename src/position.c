@@ -5,23 +5,30 @@
 #include "constants.h"
 #include "debug_hashtable.h"
 #include "generated_data.h"
+#include "pins.h"
 #include "position.h"
 
-// clang-format off
-static const square_t SQ_A1 = 0;
-static const square_t SQ_C1 = 2;   static const square_t SQ_D1 = 3;
-static const square_t SQ_E1 = 4;   static const square_t SQ_F1 = 5;
-static const square_t SQ_G1 = 6;   static const square_t SQ_H1 = 7;
-static const square_t SQ_A8 = 56;
-static const square_t SQ_C8 = 58;  static const square_t SQ_D8 = 59;
-static const square_t SQ_E8 = 60;  static const square_t SQ_F8 = 61;
-static const square_t SQ_G8 = 62;  static const square_t SQ_H8 = 63;
-
+static const square_t   SQ_A1       = 0;
+static const square_t   SQ_C1       = 2;
+static const square_t   SQ_D1       = 3;
+static const square_t   SQ_E1       = 4;
+static const square_t   SQ_F1       = 5;
+static const square_t   SQ_G1       = 6;
+static const square_t   SQ_H1       = 7;
+static const square_t   SQ_A8       = 56;
+static const square_t   SQ_C8       = 58;
+static const square_t   SQ_D8       = 59;
+static const square_t   SQ_E8       = 60;
+static const square_t   SQ_F8       = 61;
+static const square_t   SQ_G8       = 62;
+static const square_t   SQ_H8       = 63;
 static const bitboard_t BB_F1_G1    = (1ull << 5) | (1ull << 6);
 static const bitboard_t BB_B1_C1_D1 = (1ull << 1) | (1ull << 2) | (1ull << 3);
 static const bitboard_t BB_F8_G8    = (1ull << 61) | (1ull << 62);
 static const bitboard_t BB_B8_C8_D8 = (1ull << 57) | (1ull << 58) | (1ull << 59);
-// clang-format on
+
+/// @brief Low-level move generator. If @p do_all_moves is false, generates only captures.
+static move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all_moves);
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -57,7 +64,7 @@ static void position_remove_piece(position_t *pos, color_t color, piece_t piece,
 
 static void position_move_piece(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
 {
-    const bitboard_t from_to_bb = (bitboard_from_square(from) | bitboard_from_square(to));
+    const bitboard_t from_to_bb = bitboard_from_square(from) | bitboard_from_square(to);
     const zobrist_t *hash_row   = PIECE_SQUARE_HASHES[color][piece - 1];
     *piece_bitboard_mut(pos, piece) ^= from_to_bb;
     *color_bitboard_mut(pos, color) ^= from_to_bb;
@@ -68,14 +75,12 @@ static void position_move_piece(position_t *pos, color_t color, piece_t piece, s
 
 static zobrist_t position_compute_hash(const position_t *pos)
 {
-    static const piece_t ALL_PIECES[6] = {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
-    zobrist_t            hash          = (pos->state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : 0ull;
+    zobrist_t hash = (pos->state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : 0ull;
     hash ^= castling_rights_hash(pos->castling_rights);
     hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
-    square_t s;
-    for (int i = 0; i < 6; i++)
+    for (piece_t piece = PAWN; piece <= KING; ++piece)
     {
-        piece_t piece = ALL_PIECES[i];
+        square_t s;
         BB_FOREACH(s, (position_pieces_of_type(pos, piece) & pos->white_pieces))
         {
             hash ^= PIECE_SQUARE_HASHES[WHITE][piece - 1][s];
@@ -112,11 +117,11 @@ position_t position_make_move(const position_t *pos, move_t move)
 
     position_t dst = *pos;
     dst.state_flags &= ~POSITION_FLAG_NULL_MOVE;
-    const castling_rights_t old_cr = dst.castling_rights;
-    dst.castling_rights            = castling_rights_after_move(dst.castling_rights, from, to);
-    dst.hash ^= castling_rights_hash(dst.castling_rights) ^ castling_rights_hash(old_cr);
+    const castling_rights_t prev_castling_rights = dst.castling_rights;
+    dst.castling_rights                          = castling_rights_after_move(dst.castling_rights, from, to);
+    dst.hash ^= castling_rights_hash(dst.castling_rights) ^ castling_rights_hash(prev_castling_rights);
     dst.hash ^= EN_PASSANT_HASHES[dst.en_passant_square];
-    dst.en_passant_square = (square_t)(0);
+    dst.en_passant_square = 0;
 
     switch (move_type(move))
     {
@@ -213,17 +218,19 @@ position_t position_from_string(const char *fen_string)
             x += c - '0';
             continue;
         }
-        const char *wp = strchr("PNBRQK", c);
+        const char *white_pieces = "PNBRQK";
+        const char *black_pieces = "pnbrqk";
+        const char *wp           = strchr(white_pieces, c);
         if (wp)
         {
-            position_add_piece(&pos, WHITE, (piece_t)(int)(wp - "PNBRQK" + 1), square_from_coords(x, y));
+            position_add_piece(&pos, WHITE, (piece_t)(int)(wp - white_pieces + 1), square_from_coords(x, y));
             x++;
             continue;
         }
-        const char *bp = strchr("pnbrqk", c);
+        const char *bp = strchr(black_pieces, c);
         if (bp)
         {
-            position_add_piece(&pos, BLACK, (piece_t)(int)(bp - "pnbrqk" + 1), square_from_coords(x, y));
+            position_add_piece(&pos, BLACK, (piece_t)(int)(bp - black_pieces + 1), square_from_coords(x, y));
             x++;
             continue;
         }
@@ -348,7 +355,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
                     *p++      = (char)('0' + num_empty);
                     num_empty = 0;
                 }
-                piece_t     piece    = position_piece_at(pos, sq);
+                piece_t     piece    = pos->squares[sq];
                 bool        is_white = ((pos->white_pieces & sq_bb));
                 const char *chars    = is_white ? " PNBRQK" : " pnbrqk";
                 if (p < end)
@@ -453,16 +460,6 @@ bool position_is_draw_by_material(const position_t *pos)
     }
 }
 
-bool position_is_legal(const position_t *pos)
-{
-    const color_t    color      = position_color_to_move(pos);
-    const bitboard_t white_king = (pos->kings & pos->white_pieces);
-    const bitboard_t black_king = (pos->kings & pos->black_pieces);
-    return popcount(white_king) == 1 && popcount(black_king) == 1 && !(white_king == black_king) &&
-           !(KING_ATTACKS[lsb(white_king)] & black_king) &&
-           !position_is_attacked(pos, pos->king_location[enemy_of(color)], color);
-}
-
 bool position_is_checkmate(const position_t *pos)
 {
     return position_is_in_check(pos) && position_generate_legal_moves(pos).size == 0;
@@ -487,10 +484,10 @@ move_list_t position_generate_legal_captures(const position_t *pos)
 
 move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all_moves)
 {
-    const bitboard_t occupied_squares = (pos->white_pieces | pos->black_pieces);
+    const bitboard_t occupied_squares = pos->white_pieces | pos->black_pieces;
     const bitboard_t friendly_pieces  = position_pieces_of_color(pos, color);
-    const bitboard_t enemy_pieces     = (occupied_squares ^ friendly_pieces);
-    const bitboard_t enemy_pawns      = (pos->pawns & enemy_pieces);
+    const bitboard_t enemy_pieces     = occupied_squares ^ friendly_pieces;
+    const bitboard_t enemy_pawns      = pos->pawns & enemy_pieces;
     const square_t   king_locn        = pos->king_location[color];
 
     move_list_t moves;
@@ -502,14 +499,13 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
                        : (bitboard_shift_northwest(enemy_pawns) | bitboard_shift_northeast(enemy_pawns));
 
     // Remove our king so sliding attackers see through it (x-ray).
-    const bitboard_t occupied_except_king = (occupied_squares ^ bitboard_from_square(king_locn));
-
-    square_t s;
+    const bitboard_t occupied_except_king = occupied_squares ^ bitboard_from_square(king_locn);
     for (int i = 0; i < 5; i++)
     {
         const piece_t     ep  = PIECE_ATTACKERS[i].piece;
         const attack_fn_t efn = PIECE_ATTACKERS[i].fn;
         const bitboard_t  eb  = (position_pieces_of_type(pos, ep) & enemy_pieces);
+        square_t          s;
         BB_FOREACH(s, eb)
         {
             forbidden_king_squares |= efn(occupied_except_king, s);
@@ -517,16 +513,16 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     }
 
     // King moves.
-    const bitboard_t king_move_targets = (KING_ATTACKS[king_locn] & (~forbidden_king_squares));
-    const bitboard_t king_captures     = (king_move_targets & enemy_pieces);
+    const bitboard_t king_move_targets = KING_ATTACKS[king_locn] & ~forbidden_king_squares;
+    const bitboard_t king_captures     = king_move_targets & enemy_pieces;
     square_t         to;
     BB_FOREACH(to, king_captures)
     {
-        move_list_push_back(&moves, move_capture(king_locn, to, KING, position_piece_at(pos, to)));
+        move_list_push_back(&moves, move_capture(king_locn, to, KING, pos->squares[to]));
     }
     if (do_all_moves)
     {
-        const bitboard_t king_non_captures = (king_move_targets & (~occupied_squares));
+        const bitboard_t king_non_captures = king_move_targets & ~occupied_squares;
         BB_FOREACH(to, king_non_captures)
         {
             move_list_push_back(&moves, move_non_capture(king_locn, to, KING));
@@ -535,7 +531,7 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
 
     // Check restrictions: in check we can only capture the checker or interpose.
     bitboard_t allowed_captures     = enemy_pieces;
-    bitboard_t allowed_non_captures = (~occupied_squares);
+    bitboard_t allowed_non_captures = ~occupied_squares;
 
     if (position_is_in_check(pos))
     {
@@ -559,18 +555,18 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     {
         const piece_t     fp  = PIECE_ATTACKERS_EXCEPT_KING[i].piece;
         const attack_fn_t ffn = PIECE_ATTACKERS_EXCEPT_KING[i].fn;
-        const bitboard_t  fb  = (position_pieces_of_type(pos, fp) & friendly_pieces);
+        const bitboard_t  fb  = position_pieces_of_type(pos, fp) & friendly_pieces;
         BB_FOREACH(from, fb)
         {
-            const bitboard_t attacks     = (ffn(occupied_squares, from) & pins_allowed_squares(&pins, from));
-            const bitboard_t cap_targets = (attacks & allowed_captures);
+            const bitboard_t attacks     = ffn(occupied_squares, from) & pins_allowed_squares(&pins, from);
+            const bitboard_t cap_targets = attacks & allowed_captures;
             BB_FOREACH(to, cap_targets)
             {
-                move_list_push_back(&moves, move_capture(from, to, fp, position_piece_at(pos, to)));
+                move_list_push_back(&moves, move_capture(from, to, fp, pos->squares[to]));
             }
             if (do_all_moves)
             {
-                const bitboard_t non_cap_targets = (attacks & allowed_non_captures);
+                const bitboard_t non_cap_targets = attacks & allowed_non_captures;
                 BB_FOREACH(to, non_cap_targets)
                 {
                     move_list_push_back(&moves, move_non_capture(from, to, fp));
@@ -617,32 +613,32 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
 
     if (color == WHITE)
     {
-        pawns         = (pos->pawns & pos->white_pieces);
-        single_pushes = (bitboard_shift_north(pawns) & (~occupied_squares));
-        double_pushes = ((bitboard_shift_north(single_pushes) & (~occupied_squares)) & RANK4);
-        captures_west = (bitboard_shift_northwest(pawns) & pos->black_pieces);
-        captures_east = (bitboard_shift_northeast(pawns) & pos->black_pieces);
+        pawns         = pos->pawns & pos->white_pieces;
+        single_pushes = bitboard_shift_north(pawns) & ~occupied_squares;
+        double_pushes = bitboard_shift_north(single_pushes) & ~occupied_squares & RANK4;
+        captures_west = bitboard_shift_northwest(pawns) & pos->black_pieces;
+        captures_east = bitboard_shift_northeast(pawns) & pos->black_pieces;
         en_passant_sources =
-            pos->en_passant_square != 0 ? (PAWN_ATTACKS_BLACK[pos->en_passant_square] & pawns) : NO_SQUARES;
-        promotions      = (single_pushes & RANK8);
-        promotions_west = (captures_west & RANK8);
-        promotions_east = (captures_east & RANK8);
+            pos->en_passant_square != 0 ? PAWN_ATTACKS_BLACK[pos->en_passant_square] & pawns : NO_SQUARES;
+        promotions      = single_pushes & RANK8;
+        promotions_west = captures_west & RANK8;
+        promotions_east = captures_east & RANK8;
         push_delta      = 8;
         west_delta      = 7;
         east_delta      = 9;
     }
     else
     {
-        pawns         = (pos->pawns & pos->black_pieces);
-        single_pushes = (bitboard_shift_south(pawns) & (~occupied_squares));
-        double_pushes = ((bitboard_shift_south(single_pushes) & (~occupied_squares)) & RANK5);
-        captures_west = (bitboard_shift_southwest(pawns) & pos->white_pieces);
-        captures_east = (bitboard_shift_southeast(pawns) & pos->white_pieces);
+        pawns         = pos->pawns & pos->black_pieces;
+        single_pushes = bitboard_shift_south(pawns) & ~occupied_squares;
+        double_pushes = bitboard_shift_south(single_pushes) & ~occupied_squares & RANK5;
+        captures_west = bitboard_shift_southwest(pawns) & pos->white_pieces;
+        captures_east = bitboard_shift_southeast(pawns) & pos->white_pieces;
         en_passant_sources =
-            pos->en_passant_square != 0 ? (PAWN_ATTACKS_WHITE[pos->en_passant_square] & pawns) : NO_SQUARES;
-        promotions      = (single_pushes & RANK1);
-        promotions_west = (captures_west & RANK1);
-        promotions_east = (captures_east & RANK1);
+            pos->en_passant_square != 0 ? PAWN_ATTACKS_WHITE[pos->en_passant_square] & pawns : NO_SQUARES;
+        promotions      = single_pushes & RANK1;
+        promotions_west = captures_west & RANK1;
+        promotions_east = captures_east & RANK1;
         push_delta      = -8;
         west_delta      = -9;
         east_delta      = -7;
@@ -657,26 +653,26 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
         bitboard_t bb;
         int        delta;
     } bb_delta_t;
-    const bb_delta_t promo_caps[2] = {{promotions_west, west_delta}, {promotions_east, east_delta}};
+    const bb_delta_t promotion_captures[2] = {{promotions_west, west_delta}, {promotions_east, east_delta}};
     for (int i = 0; i < 2; i++)
     {
-        const bitboard_t b = (promo_caps[i].bb & allowed_captures);
+        const bitboard_t b = promotion_captures[i].bb & allowed_captures;
         BB_FOREACH(to, b)
         {
-            from = (square_t)(to - promo_caps[i].delta);
+            from = (square_t)(to - promotion_captures[i].delta);
             if (pins_is_allowed(&pins, from, to))
             {
-                move_list_push_back(&moves, move_promotion(from, to, QUEEN, position_piece_at(pos, to)));
-                move_list_push_back(&moves, move_promotion(from, to, ROOK, position_piece_at(pos, to)));
-                move_list_push_back(&moves, move_promotion(from, to, BISHOP, position_piece_at(pos, to)));
-                move_list_push_back(&moves, move_promotion(from, to, KNIGHT, position_piece_at(pos, to)));
+                move_list_push_back(&moves, move_promotion(from, to, QUEEN, pos->squares[to]));
+                move_list_push_back(&moves, move_promotion(from, to, ROOK, pos->squares[to]));
+                move_list_push_back(&moves, move_promotion(from, to, BISHOP, pos->squares[to]));
+                move_list_push_back(&moves, move_promotion(from, to, KNIGHT, pos->squares[to]));
             }
         }
     }
 
     // Quiet promotions.
     {
-        const bitboard_t b = (promotions & allowed_non_captures);
+        const bitboard_t b = promotions & allowed_non_captures;
         BB_FOREACH(to, b)
         {
             from = (square_t)(to - push_delta);
@@ -691,16 +687,16 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     }
 
     // Non-promotion captures.
-    const bb_delta_t caps[2] = {{captures_west, west_delta}, {captures_east, east_delta}};
+    const bb_delta_t pawn_captures[2] = {{captures_west, west_delta}, {captures_east, east_delta}};
     for (int i = 0; i < 2; i++)
     {
-        const bitboard_t b = (caps[i].bb & allowed_captures);
+        const bitboard_t b = pawn_captures[i].bb & allowed_captures;
         BB_FOREACH(to, b)
         {
-            from = (square_t)(to - caps[i].delta);
+            from = (square_t)(to - pawn_captures[i].delta);
             if (pins_is_allowed(&pins, from, to))
             {
-                move_list_push_back(&moves, move_capture(from, to, PAWN, position_piece_at(pos, to)));
+                move_list_push_back(&moves, move_capture(from, to, PAWN, pos->squares[to]));
             }
         }
     }
@@ -708,7 +704,7 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     if (do_all_moves)
     {
         // Single pawn pushes.
-        bitboard_t b = (single_pushes & allowed_non_captures);
+        bitboard_t b = single_pushes & allowed_non_captures;
         BB_FOREACH(to, b)
         {
             from = (square_t)(to - push_delta);
@@ -718,7 +714,7 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
             }
         }
         // Double pawn pushes.
-        b = (double_pushes & allowed_non_captures);
+        b = double_pushes & allowed_non_captures;
         BB_FOREACH(to, b)
         {
             from = (square_t)(to - push_delta * 2);
@@ -730,30 +726,29 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     }
 
     // En passant captures.
-    BB_FOREACH(s, en_passant_sources)
+    // square_t from;
+    BB_FOREACH(from, en_passant_sources)
     {
         const square_t ep_to         = pos->en_passant_square;
-        const square_t captured_pawn = (square_t)((s & 0x38) | (ep_to & 0x07));
-        if (pins_is_allowed(&pins, s, ep_to) && ((allowed_captures & bitboard_from_square(captured_pawn))))
+        const square_t captured_pawn = (square_t)((from & 0x38) | (ep_to & 0x07));
+        if (pins_is_allowed(&pins, from, ep_to) && (allowed_captures & bitboard_from_square(captured_pawn)))
         {
-            if (square_rank(king_locn) == square_rank(s))
+            if (square_rank(king_locn) == square_rank(from))
             {
                 // Test for the rare discovered horizontal check when removing both pawns from king's rank.
                 const bitboard_t pseudo_occ =
-                    ((occupied_squares ^ bitboard_from_square(captured_pawn)) ^ bitboard_from_square(s));
-                const bitboard_t horizontal =
-                    (rook_attacks(pseudo_occ, king_locn) & (WEST[king_locn] | EAST[king_locn]));
+                    occupied_squares ^ bitboard_from_square(captured_pawn) ^ bitboard_from_square(from);
+                const bitboard_t horizontal = rook_attacks(pseudo_occ, king_locn) & (WEST[king_locn] | EAST[king_locn]);
                 if (!(horizontal & (enemy_pieces & (pos->rooks | pos->queens))))
                 {
-                    move_list_push_back(&moves, move_ep_capture(s, ep_to));
+                    move_list_push_back(&moves, move_ep_capture(from, ep_to));
                 }
             }
             else
             {
-                move_list_push_back(&moves, move_ep_capture(s, ep_to));
+                move_list_push_back(&moves, move_ep_capture(from, ep_to));
             }
         }
     }
-
     return moves;
 }

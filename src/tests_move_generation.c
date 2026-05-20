@@ -59,7 +59,7 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
     const bitboard_t enemy_pieces     = (occupied_squares & (~friendly_pieces));
 
     // Pawn moves.
-    bitboard_t pawns = (position_pawns(position) & friendly_pieces);
+    bitboard_t pawns = (position->pawns & friendly_pieces);
     square_t   from;
     BB_FOREACH(from, pawns)
     {
@@ -92,17 +92,17 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
         {
             if (square_rank(cap_sq) == PROMOTION_RANK[color])
             {
-                move_list_push_back(&moves, move_promotion(from, cap_sq, QUEEN, position_piece_at(position, cap_sq)));
-                move_list_push_back(&moves, move_promotion(from, cap_sq, ROOK, position_piece_at(position, cap_sq)));
-                move_list_push_back(&moves, move_promotion(from, cap_sq, BISHOP, position_piece_at(position, cap_sq)));
-                move_list_push_back(&moves, move_promotion(from, cap_sq, KNIGHT, position_piece_at(position, cap_sq)));
+                move_list_push_back(&moves, move_promotion(from, cap_sq, QUEEN, position->squares[cap_sq]));
+                move_list_push_back(&moves, move_promotion(from, cap_sq, ROOK, position->squares[cap_sq]));
+                move_list_push_back(&moves, move_promotion(from, cap_sq, BISHOP, position->squares[cap_sq]));
+                move_list_push_back(&moves, move_promotion(from, cap_sq, KNIGHT, position->squares[cap_sq]));
             }
             else
             {
-                move_list_push_back(&moves, move_capture(from, cap_sq, PAWN, position_piece_at(position, cap_sq)));
+                move_list_push_back(&moves, move_capture(from, cap_sq, PAWN, position->squares[cap_sq]));
             }
         }
-        square_t ep = position_en_passant_square(position);
+        square_t ep = position->en_passant_square;
         if (ep != 0 && ((pawn_attacks & bitboard_from_square(ep))))
         {
             move_list_push_back(&moves, move_ep_capture(from, ep));
@@ -122,14 +122,14 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
             bitboard_t       non_cap = (attacks & vacant_squares);
             square_t         to_sq;
             BB_FOREACH(to_sq, cap)
-            move_list_push_back(&moves, move_capture(from, to_sq, piece, position_piece_at(position, to_sq)));
+            move_list_push_back(&moves, move_capture(from, to_sq, piece, position->squares[to_sq]));
             BB_FOREACH(to_sq, non_cap)
             move_list_push_back(&moves, move_non_capture(from, to_sq, piece));
         }
     }
     // King moves.
     {
-        bitboard_t king_bb = (position_kings(position) & friendly_pieces);
+        bitboard_t king_bb = (position->kings & friendly_pieces);
         BB_FOREACH(from, king_bb)
         {
             const bitboard_t attacks = KING_ATTACKS[from];
@@ -137,7 +137,7 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
             bitboard_t       non_cap = (attacks & vacant_squares);
             square_t         to_sq;
             BB_FOREACH(to_sq, cap)
-            move_list_push_back(&moves, move_capture(from, to_sq, KING, position_piece_at(position, to_sq)));
+            move_list_push_back(&moves, move_capture(from, to_sq, KING, position->squares[to_sq]));
             BB_FOREACH(to_sq, non_cap)
             move_list_push_back(&moves, move_non_capture(from, to_sq, KING));
         }
@@ -223,7 +223,7 @@ static void perft_regression(const position_t *src_position, int depth, uint64_t
     for (int i = 0; i < pseudo_list.size; ++i)
     {
         position_t dst = position_make_move(src_position, pseudo_list.items[i]);
-        if (!position_is_attacked(&dst, position_king_location(&dst, color), color == WHITE ? BLACK : WHITE))
+        if (!position_is_attacked(&dst, dst.king_location[color], enemy_of(color)))
         {
             move_list_push_back(&validated, pseudo_list.items[i]);
         }

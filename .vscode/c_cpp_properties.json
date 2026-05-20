@@ -5,9 +5,9 @@
       "includePath": [
         "${workspaceFolder}/**"
       ],
-      "cppStandard": "c++20",
       "defines": [
-        "DEBUGX=1"
+        "DEBUGX=1",
+        "POSIX_C_SOURCE=200809L"
       ],
       "configurationProvider": "ms-vscode.makefile-tools",
       "cStandard": "c17",

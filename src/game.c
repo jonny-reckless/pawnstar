@@ -82,7 +82,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
     {
         move_t *m     = &moves->items[i];
         int     score = PIECE_VALUES[(int)move_captured(*m)] * 10000 - PIECE_VALUES[(int)move_piece(*m)] * 1000 +
-                    (int)history_table_get_count(&self->history_table, ply, *m);
+                        (int)history_table_get_count(&self->history_table, ply, *m);
         move_assign_score(m, score);
     }
     move_list_sort(moves);
@@ -90,7 +90,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
 
 bool game_is_draw_by_fifty_moves(const game_t *self)
 {
-    if (position_reversible_move_count(game_current_position_const(self)) >= 100)
+    if (game_current_position_const(self)->reversible_move_count >= 100)
     {
         INCREMENT("draws by 50 moves");
         return true;
@@ -101,17 +101,17 @@ bool game_is_draw_by_fifty_moves(const game_t *self)
 bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
-    const zobrist_t hash        = position_hash(game_current_position_const(self));
+    const zobrist_t hash        = game_current_position_const(self)->hash;
     const int       size        = position_stack_size(&self->positions);
     for (int i = size - 5; i >= 0; i -= 2)
     {
         const position_t *p = position_stack_get_const(&self->positions, i);
-        if (position_hash(p) == hash && --repetitions == 0)
+        if (p->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (position_reversible_move_count(p) == 0)
+        if (p->reversible_move_count == 0)
         {
             return false;
         }

@@ -104,16 +104,6 @@ static inline move_t move_double_push(square_t from, square_t to)
 }
 
 // ---------------------------------------------------------------------------
-// String-literal square conveniences (parse "e4" at call site)
-// ---------------------------------------------------------------------------
-
-/// @brief Castling move constructed from square-name strings (e.g. @c "e1", @c "g1").
-static inline move_t move_castling_str(const char *from_str, const char *to_str)
-{
-    return move_castling(square_from_string(from_str), square_from_string(to_str));
-}
-
-// ---------------------------------------------------------------------------
 // Accessors
 // ---------------------------------------------------------------------------
 
@@ -302,12 +292,6 @@ static inline void variation_list_clear(variation_list_t *self)
 static inline void variation_list_push_back(variation_list_t *self, move_t m)
 {
     self->items[self->size++] = m;
-}
-
-/// @brief Return the move at index @p i.
-static inline move_t variation_list_get(const variation_list_t *self, int i)
-{
-    return self->items[i];
 }
 
 /// @brief Copy @p src into @p dst, prepending @p best_move as the first entry.

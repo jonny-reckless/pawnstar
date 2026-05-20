@@ -115,8 +115,8 @@ static const bitboard_t FILE_BITBOARDS[8] = {
 
 static pawn_structure_t determine_pawn_structure(const position_t *pos, color_t color)
 {
-    const bitboard_t friendly_pawns = (position_pawns(pos) & position_pieces_of_color(pos, color));
-    const bitboard_t enemy_pawns    = (position_pawns(pos) ^ friendly_pawns);
+    const bitboard_t friendly_pawns = (pos->pawns & position_pieces_of_color(pos, color));
+    const bitboard_t enemy_pawns    = (pos->pawns ^ friendly_pawns);
     pawn_structure_t ps             = {NO_SQUARES, NO_SQUARES, NO_SQUARES, NO_SQUARES, NO_SQUARES};
 
     const bitboard_t *passed_pawn_mask    = color == WHITE ? PASSED_PAWN_MASK_WHITE : PASSED_PAWN_MASK_BLACK;
@@ -182,11 +182,11 @@ static pawn_structure_t determine_pawn_structure(const position_t *pos, color_t 
 static int evaluate_material(const position_t *pos, color_t color)
 {
     const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
-    const bitboard_t pawns           = (position_pawns(pos) & friendly_pieces);
-    const bitboard_t knights         = (position_knights(pos) & friendly_pieces);
-    const bitboard_t bishops         = (position_bishops(pos) & friendly_pieces);
-    const bitboard_t rooks           = (position_rooks(pos) & friendly_pieces);
-    const bitboard_t queens          = (position_queens(pos) & friendly_pieces);
+    const bitboard_t pawns           = (pos->pawns & friendly_pieces);
+    const bitboard_t knights         = (pos->knights & friendly_pieces);
+    const bitboard_t bishops         = (pos->bishops & friendly_pieces);
+    const bitboard_t rooks           = (pos->rooks & friendly_pieces);
+    const bitboard_t queens          = (pos->queens & friendly_pieces);
     // clang-format off
     int score = popcount(pawns)   *  100 +
                 popcount(knights) *  400 +
@@ -207,7 +207,7 @@ static int evaluate_mobility(const position_t *pos, color_t color, const pawn_st
     const bitboard_t occupied_squares = position_occupied_squares(pos);
     int              score            = 0;
     square_t         s;
-    BB_FOREACH(s, (position_bishops(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->bishops & friendly_pieces))
     {
         bitboard_t attacks = (bishop_attacks(occupied_squares, s) & (~friendly_pieces));
         if (color == WHITE)
@@ -220,7 +220,7 @@ static int evaluate_mobility(const position_t *pos, color_t color, const pawn_st
         }
         score += BISHOP_ATTACK_SCORES[popcount(attacks)];
     }
-    BB_FOREACH(s, (position_rooks(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->rooks & friendly_pieces))
     {
         const bitboard_t attacks = (rook_attacks(occupied_squares, s) & (~friendly_pieces));
         score += ROOK_ATTACK_SCORES[popcount(attacks)];
@@ -234,23 +234,23 @@ static int evaluate_piece_square(const position_t *pos, color_t color)
     const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
     int              score           = 0;
     square_t         s;
-    BB_FOREACH(s, (position_pawns(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->pawns & friendly_pieces))
     {
         score += PAWN_SQUARE[s ^ rank_flip];
     }
-    BB_FOREACH(s, (position_knights(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->knights & friendly_pieces))
     {
         score += KNIGHT_SQUARE[s ^ rank_flip];
     }
-    BB_FOREACH(s, (position_bishops(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->bishops & friendly_pieces))
     {
         score += BISHOP_SQUARE[s ^ rank_flip];
     }
-    BB_FOREACH(s, (position_rooks(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->rooks & friendly_pieces))
     {
         score += ROOK_SQUARE[s ^ rank_flip];
     }
-    BB_FOREACH(s, (position_queens(pos) & friendly_pieces))
+    BB_FOREACH(s, (pos->queens & friendly_pieces))
     {
         score += QUEEN_SQUARE[s ^ rank_flip];
     }
@@ -278,12 +278,11 @@ static int evaluate_king(const position_t *pos, color_t color)
     const uint8_t    rank_flip       = (uint8_t)(color == WHITE ? RANK_FLIP : 0);
     const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
     const bitboard_t enemy_pieces    = position_pieces_of_color(pos, enemy_of(color));
-    const bitboard_t friendly_pawns  = (friendly_pieces & position_pawns(pos));
-    const bitboard_t enemy_pawns     = (enemy_pieces & position_pawns(pos));
-    const bool       is_endgame =
-        (!(position_queens(pos))) && popcount((position_occupied_squares(pos) ^ position_pawns(pos))) < 8;
+    const bitboard_t friendly_pawns  = (friendly_pieces & pos->pawns);
+    const bitboard_t enemy_pawns     = (enemy_pieces & pos->pawns);
+    const bool       is_endgame      = (!(pos->queens)) && popcount((position_occupied_squares(pos) ^ pos->pawns)) < 8;
 
-    const square_t king_loc = position_king_location(pos, color);
+    const square_t king_loc = pos->king_location[color];
     const int      piece_square_score =
         is_endgame ? KING_SQUARE_ENDGAME[king_loc ^ rank_flip] : KING_SQUARE_MIDGAME[king_loc ^ rank_flip];
 
