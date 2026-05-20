@@ -105,7 +105,7 @@ static int evaluate_swap_off(see_board_t *bb, square_t location, color_t color, 
         break;
 
     found:
-        attackers = bitboard_isolate_lsb(attackers);
+        attackers = isolate_lsb(attackers);
         *see_board_pieces_of_type(bb, piece_on_square) ^= square;
         *see_board_pieces_of_color(bb, enemy_of(color)) ^= square;
         *see_board_pieces_of_type(bb, capturing_piece) ^= (attackers | square);
@@ -125,7 +125,9 @@ static int evaluate_swap_off(see_board_t *bb, square_t location, color_t color, 
     {
         scores[ply] -= scores[ply + 1];
         if (scores[ply] < 0)
+        {
             scores[ply] = 0;
+        }
     }
     return scores[0];
 }

@@ -188,11 +188,11 @@ static int evaluate_material(const position_t *pos, color_t color)
     const bitboard_t rooks           = (position_rooks(pos) & friendly_pieces);
     const bitboard_t queens          = (position_queens(pos) & friendly_pieces);
     // clang-format off
-    int score = bitboard_pop_count(pawns)   *  100 +
-                bitboard_pop_count(knights) *  400 +
-                bitboard_pop_count(bishops) *  400 +
-                bitboard_pop_count(rooks)   *  600 +
-                bitboard_pop_count(queens)  * 1200;
+    int score = popcount(pawns)   *  100 +
+                popcount(knights) *  400 +
+                popcount(bishops) *  400 +
+                popcount(rooks)   *  600 +
+                popcount(queens)  * 1200;
     // clang-format on
     if (((bishops & WHITE_SQUARES)) && ((bishops & BLACK_SQUARES)))
     {
@@ -218,12 +218,12 @@ static int evaluate_mobility(const position_t *pos, color_t color, const pawn_st
         {
             attacks &= (~ps[WHITE].defended_pawns);
         }
-        score += BISHOP_ATTACK_SCORES[bitboard_pop_count(attacks)];
+        score += BISHOP_ATTACK_SCORES[popcount(attacks)];
     }
     BB_FOREACH(s, (position_rooks(pos) & friendly_pieces))
     {
         const bitboard_t attacks = (rook_attacks(occupied_squares, s) & (~friendly_pieces));
-        score += ROOK_ATTACK_SCORES[bitboard_pop_count(attacks)];
+        score += ROOK_ATTACK_SCORES[popcount(attacks)];
     }
     return score;
 }
@@ -266,10 +266,10 @@ static int evaluate_pawn_structure(const pawn_structure_t *ps, color_t color)
     {
         score += PASSED_PAWN_SQUARE[s ^ rank_flip];
     }
-    score += bitboard_pop_count(ps->defended_pawns) * 5;
-    score -= bitboard_pop_count(ps->backward_pawns) * 10;
-    score -= bitboard_pop_count(ps->doubled_pawns) * 10;
-    score -= bitboard_pop_count(ps->isolated_pawns) * 20;
+    score += popcount(ps->defended_pawns) * 5;
+    score -= popcount(ps->backward_pawns) * 10;
+    score -= popcount(ps->doubled_pawns) * 10;
+    score -= popcount(ps->isolated_pawns) * 20;
     return score;
 }
 
@@ -281,7 +281,7 @@ static int evaluate_king(const position_t *pos, color_t color)
     const bitboard_t friendly_pawns  = (friendly_pieces & position_pawns(pos));
     const bitboard_t enemy_pawns     = (enemy_pieces & position_pawns(pos));
     const bool       is_endgame =
-        (!(position_queens(pos))) && bitboard_pop_count((position_occupied_squares(pos) ^ position_pawns(pos))) < 8;
+        (!(position_queens(pos))) && popcount((position_occupied_squares(pos) ^ position_pawns(pos))) < 8;
 
     const square_t king_loc = position_king_location(pos, color);
     const int      piece_square_score =
@@ -305,12 +305,12 @@ static int evaluate_king(const position_t *pos, color_t color)
         }
         // clang-format off
         safety_score =
-            15 * bitboard_pop_count((friendly_pawns & pawn_shelter_1)) +
-            10 * bitboard_pop_count((friendly_pawns & pawn_shelter_2)) +
-             5 * bitboard_pop_count((friendly_pawns & pawn_shelter_3)) -
-            15 * bitboard_pop_count((enemy_pawns & pawn_shelter_1)) -
-            10 * bitboard_pop_count((enemy_pawns & pawn_shelter_2)) -
-             5 * bitboard_pop_count((enemy_pawns & pawn_shelter_3));
+            15 * popcount((friendly_pawns & pawn_shelter_1)) +
+            10 * popcount((friendly_pawns & pawn_shelter_2)) +
+             5 * popcount((friendly_pawns & pawn_shelter_3)) -
+            15 * popcount((enemy_pawns & pawn_shelter_1)) -
+            10 * popcount((enemy_pawns & pawn_shelter_2)) -
+             5 * popcount((enemy_pawns & pawn_shelter_3));
         // clang-format on
 
         const bitboard_t king_file = FILE_BITBOARDS[square_file(king_loc)];
@@ -332,7 +332,7 @@ static int evaluate_king(const position_t *pos, color_t color)
     const bitboard_t adjacent1 = KING_ATTACKS[king_loc];
     const bitboard_t adjacent2 = (KING_ATTACKS2[king_loc] ^ adjacent1);
     const bitboard_t non_pawns = (friendly_pieces ^ friendly_pawns);
-    safety_score += 10 * bitboard_pop_count((adjacent1 & non_pawns)) + 5 * bitboard_pop_count((adjacent2 & non_pawns));
+    safety_score += 10 * popcount((adjacent1 & non_pawns)) + 5 * popcount((adjacent2 & non_pawns));
     return piece_square_score + safety_score;
 }
 

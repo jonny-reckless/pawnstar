@@ -67,7 +67,7 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
     const position_t *position = game_current_position(game);
     const color_t     color    = position_color_to_move(position);
     if (!position_is_null_move(position) && !position_is_in_check(position) && beta == alpha + 1 &&
-        bitboard_pop_count(position_pieces_of_color(position, color)) > 3)
+        popcount(position_pieces_of_color(position, color)) > 3)
     {
         const int eval_score = evaluate_position(game, alpha, beta);
         if (eval_score >= beta)
@@ -79,9 +79,13 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
             int score = -search(game, depth - 3, ply + 1, -beta, -alpha, &dummy);
             game_undo_move(game);
             if (game->is_cancel_pending)
+            {
                 return (null_move_result_t){SEARCH_CANCELLED_SCORE, eval_score};
+            }
             if (score >= beta)
+            {
                 return (null_move_result_t){beta, eval_score};
+            }
             INCREMENT("null move fails");
             return (null_move_result_t){alpha, eval_score};
         }
@@ -102,7 +106,9 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
 
     const position_t *position = game_current_position(game);
     if (position_is_draw_by_material(position) || game_is_draw_by_fifty_moves(game) || game_is_draw_by_repetition(game))
+    {
         return DRAW_SCORE;
+    }
 
     if (position_is_in_check(position))
     {
@@ -149,13 +155,19 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
     }
 
     if (depth <= 0 && !position_is_in_check(position))
+    {
         return search_quiescent(game, depth, ply, alpha, beta);
+    }
 
     null_move_result_t nm = attempt_null_move(game, depth, ply, alpha, beta);
     if (game->is_cancel_pending)
+    {
         return SEARCH_CANCELLED_SCORE;
+    }
     if (nm.score >= beta)
+    {
         return nm.score;
+    }
 
     variation_list_t pv;
     variation_list_clear(&pv);
@@ -169,7 +181,9 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         best_move = transposition.move;
         int score = search_single_move(game, depth, ply, alpha, beta, transposition.move, &pv, 0).score;
         if (game->is_cancel_pending)
+        {
             return SEARCH_CANCELLED_SCORE;
+        }
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
@@ -212,7 +226,9 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
     {
         move_t move = move_list.items[i];
         if (has_transposition && move_equals(move, transposition.move))
+        {
             continue;
+        }
 
         int lmr_depth = depth;
         if (i > 3 && !position_is_in_check(pos) && depth > 2 && beta == alpha + 1 && move_captured(move) == NONE &&
@@ -234,7 +250,9 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
             score = search_single_move(game, depth, ply, alpha, beta, move, &pv, i).score;
         }
         if (game->is_cancel_pending)
+        {
             return SEARCH_CANCELLED_SCORE;
+        }
 
         if (score >= beta)
         {

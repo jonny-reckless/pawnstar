@@ -316,5 +316,7 @@ static inline void copy_variation(variation_list_t *dst, const variation_list_t 
     dst->size = 0;
     variation_list_push_back(dst, best_move);
     for (int i = 0; i < src->size && dst->size < MAX_PLY; i++)
+    {
         variation_list_push_back(dst, src->items[i]);
+    }
 }

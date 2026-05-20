@@ -32,7 +32,9 @@ int main(void)
     game_t game;
     game_init(&game);
     if (!opening_book_initialize(&game.book, "pawnstar.book"))
+    {
         printf("info string Unable to open book file.\n");
+    }
 
     debug_x_clear();
     printf("ready\n");
@@ -40,7 +42,9 @@ int main(void)
 
     char line[4096];
     while (fgets(line, sizeof(line), stdin))
+    {
         process_input(&game, line);
+    }
 
     game_free(&game);
     return 0;

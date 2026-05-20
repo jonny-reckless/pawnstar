@@ -164,19 +164,27 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
         {
             if (position_may_white_castle_kingside(position) && !((occupied_squares & F1_G1)) &&
                 !position_is_attacked(position, SQ_F1, BLACK) && !position_is_attacked(position, SQ_G1, BLACK))
+            {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_G1));
+            }
             if (position_may_white_castle_queenside(position) && !((occupied_squares & B1_C1_D1)) &&
                 !position_is_attacked(position, SQ_D1, BLACK) && !position_is_attacked(position, SQ_C1, BLACK))
+            {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_C1));
+            }
         }
         else
         {
             if (position_may_black_castle_kingside(position) && !((occupied_squares & F8_G8)) &&
                 !position_is_attacked(position, SQ_F8, WHITE) && !position_is_attacked(position, SQ_G8, WHITE))
+            {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_G8));
+            }
             if (position_may_black_castle_queenside(position) && !((occupied_squares & B8_C8_D8)) &&
                 !position_is_attacked(position, SQ_D8, WHITE) && !position_is_attacked(position, SQ_C8, WHITE))
+            {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_C8));
+            }
         }
     }
     return moves;
@@ -193,9 +201,13 @@ static int compare_move_bits(const void *a, const void *b)
     int64_t       va = *ma & 0x3FFFFF;
     int64_t       vb = *mb & 0x3FFFFF;
     if (va < vb)
+    {
         return -1;
+    }
     if (va > vb)
+    {
         return 1;
+    }
     return 0;
 }
 
@@ -296,10 +308,14 @@ void run_perft_tests(bool do_regression)
         // Copy FEN (up to the first ';') into stable storage.
         const char *semi = strchr(line, ';');
         if (!semi)
+        {
             continue;
+        }
         int fen_len = (int)(semi - line);
         if (fen_len >= (int)sizeof(fen_storage[r]))
+        {
             fen_len = (int)sizeof(fen_storage[r]) - 1;
+        }
         memcpy(fen_storage[r], line, (size_t)fen_len);
         fen_storage[r][fen_len] = '\0';
 
@@ -344,15 +360,21 @@ void run_perft_tests(bool do_regression)
         struct timespec start, stop;
         clock_gettime(CLOCK_MONOTONIC, &start);
         if (do_regression)
+        {
             perft_regression(&position, tests[i].depth, &num_moves);
+        }
         else
+        {
             perft(&position, tests[i].depth, &num_moves);
+        }
         clock_gettime(CLOCK_MONOTONIC, &stop);
 
         int64_t elapsed_us =
             (int64_t)(stop.tv_sec - start.tv_sec) * 1000000LL + (stop.tv_nsec - start.tv_nsec) / 1000LL;
         if (elapsed_us == 0)
+        {
             elapsed_us = 1;
+        }
 
         printf("%-75s depth:%2d moves:%10" PRIu64 " Mnps:%4" PRIu64 "\n", pos_buf, tests[i].depth, num_moves,
                num_moves / (uint64_t)elapsed_us);
@@ -370,7 +392,9 @@ void run_perft_tests(bool do_regression)
     int64_t total_ms = (int64_t)(last_stop.tv_sec - first_start.tv_sec) * 1000LL +
                        (last_stop.tv_nsec - first_start.tv_nsec) / 1000000LL;
     if (total_ms == 0)
+    {
         total_ms = 1;
+    }
 
     printf("%-40s%10lld\n", "total elapsed milliseconds", (long long)total_ms);
     printf("%-40s%10lld\n", "mean positions per second", (long long)(total_nodes * 1000 / (uint64_t)total_ms));

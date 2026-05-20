@@ -55,7 +55,9 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         score = -search_quiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game_undo_move(game);
         if (game->is_cancel_pending)
+        {
             return SEARCH_CANCELLED_SCORE;
+        }
         if (score >= beta)
         {
             INCREMENT("quiescent table move beta cutoffs");
@@ -81,13 +83,17 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
     {
         move_t move = move_list.items[i];
         if (has_transposition && move_equals(move, transposition.move))
+        {
             continue;
+        }
 
         game_play_move(game, move);
         score = -search_quiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game_undo_move(game);
         if (game->is_cancel_pending)
+        {
             return SEARCH_CANCELLED_SCORE;
+        }
 
         if (score >= beta)
         {

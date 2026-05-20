@@ -112,7 +112,9 @@ bool game_is_draw_by_repetition(const game_t *self)
             return true;
         }
         if (position_reversible_move_count(p) == 0)
+        {
             return false;
+        }
     }
     return false;
 }
@@ -194,5 +196,7 @@ void game_start_thinking(game_t *self)
     self->is_cancel_pending = false;
     self->worker_running    = true;
     if (thrd_create(&self->worker_thread, search_thread_entry, self) != thrd_success)
+    {
         self->worker_running = false;
+    }
 }

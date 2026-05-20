@@ -40,15 +40,21 @@ void transposition_table_record(transposition_table_t *self, const transposition
 void transposition_table_age(transposition_table_t *self)
 {
     for (size_t i = 0; i < self->size; ++i)
+    {
         self->table[i].is_old = true;
+    }
 }
 
 void transposition_table_usage_stats(const transposition_table_t *self, size_t *count_out, int *percent_out)
 {
     size_t count = 0;
     for (size_t i = 0; i < self->size; ++i)
+    {
         if (self->table[i].hash != 0)
+        {
             ++count;
+        }
+    }
     *count_out   = count;
     *percent_out = (int)((count * 100) / self->size);
 }

@@ -35,9 +35,13 @@ static int compare_entries(const void *a, const void *b)
     const book_entry_t *ea = (const book_entry_t *)a;
     const book_entry_t *eb = (const book_entry_t *)b;
     if (ea->key < eb->key)
+    {
         return -1;
+    }
     if (ea->key > eb->key)
+    {
         return 1;
+    }
     return 0;
 }
 
@@ -87,10 +91,14 @@ static move_t parse_san(const position_t *pos, const char *san_in)
     // Strip trailing annotation characters.
     int len = (int)strlen(san);
     while (len > 0 && (san[len - 1] == '+' || san[len - 1] == '#' || san[len - 1] == '!' || san[len - 1] == '?'))
+    {
         san[--len] = '\0';
+    }
 
     if (len == 0)
+    {
         return move_none();
+    }
 
     const move_list_t moves = position_generate_legal_moves(pos);
 
@@ -101,7 +109,9 @@ static move_t parse_san(const position_t *pos, const char *san_in)
         {
             move_t m = moves.items[i];
             if (move_type(m) == MOVE_CASTLING && square_file(move_to(m)) == 2)
+            {
                 return m;
+            }
         }
         return move_none();
     }
@@ -111,7 +121,9 @@ static move_t parse_san(const position_t *pos, const char *san_in)
         {
             move_t m = moves.items[i];
             if (move_type(m) == MOVE_CASTLING && square_file(move_to(m)) == 6)
+            {
                 return m;
+            }
         }
         return move_none();
     }
@@ -172,12 +184,16 @@ static move_t parse_san(const position_t *pos, const char *san_in)
 
     // Destination square is the last two characters.
     if (len < (int)i + 2)
+    {
         return move_none();
+    }
 
     const char dest_file_char = san[len - 2];
     const char dest_rank_char = san[len - 1];
     if (dest_file_char < 'a' || dest_file_char > 'h' || dest_rank_char < '1' || dest_rank_char > '8')
+    {
         return move_none();
+    }
 
     square_t to_sq = square_from_coords(dest_file_char - 'a', dest_rank_char - '1');
 
@@ -188,26 +204,42 @@ static move_t parse_san(const position_t *pos, const char *san_in)
     {
         char c = san[j];
         if (c >= 'a' && c <= 'h')
+        {
             disambig_file = c - 'a';
+        }
         else if (c >= '1' && c <= '8')
+        {
             disambig_rank = c - '1';
+        }
     }
 
     for (int k = 0; k < moves.size; ++k)
     {
         move_t m = moves.items[k];
         if (move_piece(m) != moving_piece)
+        {
             continue;
+        }
         if (move_to(m) != to_sq)
+        {
             continue;
+        }
         if (disambig_file >= 0 && square_file(move_from(m)) != (uint8_t)disambig_file)
+        {
             continue;
+        }
         if (disambig_rank >= 0 && square_rank(move_from(m)) != (uint8_t)disambig_rank)
+        {
             continue;
+        }
         if (promo_piece != NONE && move_promoted(m) != promo_piece)
+        {
             continue;
+        }
         if (promo_piece == NONE && move_promoted(m) != NONE)
+        {
             continue;
+        }
         return m;
     }
     return move_none();
@@ -234,7 +266,9 @@ static bool parse_line_of_play(opening_book_t *self, const char *line)
             continue;
         }
         if (token[0] == '#')
+        {
             return true;
+        }
 
         const zobrist_t hash  = position_hash(&position);
         move_list_t     legal = position_generate_legal_moves(&position);
@@ -267,7 +301,9 @@ static bool parse_line_of_play(opening_book_t *self, const char *line)
             }
         }
         if (!entry)
+        {
             entry = get_or_create_entry(self, hash);
+        }
         entry_push_move(entry, found);
 
         position = position_make_move(&position, found);
@@ -294,20 +330,26 @@ static void pgn_skip_through(FILE *f, char end)
 {
     int c;
     while ((c = fgetc(f)) != EOF && c != (int)end)
+    {
         ;
+    }
 }
 
 static void pgn_skip_to_eol(FILE *f)
 {
     int c;
     while ((c = fgetc(f)) != EOF && c != '\n')
+    {
         ;
+    }
 }
 
 static void pgn_process_token(pgn_state_t *s)
 {
     if (s->token_len == 0)
+    {
         return;
+    }
     s->token[s->token_len] = '\0';
 
     if (strcmp(s->token, "1-0") == 0 || strcmp(s->token, "0-1") == 0 || strcmp(s->token, "1/2-1/2") == 0 ||
@@ -328,7 +370,9 @@ static void pgn_process_token(pgn_state_t *s)
     // Strip leading move-number prefix (digits and dots).
     const char *san = s->token;
     while (*san && (isdigit((unsigned char)*san) || *san == '.'))
+    {
         ++san;
+    }
 
     if (*san == '\0' || *san == '$')
     {
@@ -366,7 +410,9 @@ static void pgn_process_token(pgn_state_t *s)
         }
     }
     if (!entry)
+    {
         entry = get_or_create_entry(s->book, hash);
+    }
     entry_push_move(entry, move);
 
     s->position  = position_make_move(&s->position, move);
@@ -407,11 +453,15 @@ static bool parse_pgn(opening_book_t *self, FILE *f)
         if (c == ')')
         {
             if (s.var_depth > 0)
+            {
                 --s.var_depth;
+            }
             continue;
         }
         if (s.var_depth > 0)
+        {
             continue;
+        }
         if (c == '[')
         {
             pgn_process_token(&s);
@@ -425,7 +475,9 @@ static bool parse_pgn(opening_book_t *self, FILE *f)
         }
 
         if (s.token_len < (int)(sizeof(s.token) - 1))
+        {
             s.token[s.token_len++] = (char)c;
+        }
     }
     pgn_process_token(&s);
     return true;
@@ -444,19 +496,25 @@ void opening_book_init(opening_book_t *self)
     clock_gettime(CLOCK_MONOTONIC, &ts);
     self->prng_state = (uint64_t)ts.tv_nsec ^ ((uint64_t)ts.tv_sec << 32);
     if (!self->prng_state)
+    {
         self->prng_state = 1;
+    }
 }
 
 bool opening_book_initialize(opening_book_t *self, const char *filename)
 {
     FILE *f = fopen(filename, "r");
     if (!f)
+    {
         return false;
+    }
 
     // Peek at the first non-whitespace character to detect format.
     int c;
     while ((c = fgetc(f)) != EOF && isspace(c))
+    {
         ;
+    }
 
     bool ok;
     if (c == '[')
@@ -465,7 +523,9 @@ bool opening_book_initialize(opening_book_t *self, const char *filename)
         rewind(f);
         // Skip whitespace again.
         while ((c = fgetc(f)) != EOF && isspace(c))
+        {
             ;
+        }
         // Now c is '[': proceed with PGN parser reading from f.
         // Push the '[' back by unreading it.
         ungetc(c, f);
@@ -496,7 +556,9 @@ bool opening_book_initialize(opening_book_t *self, const char *filename)
 
     // Sort entries by key for bsearch.
     if (self->entry_count > 0)
+    {
         qsort(self->entries, self->entry_count, sizeof(book_entry_t), compare_entries);
+    }
 
     return ok;
 }
@@ -505,7 +567,9 @@ move_t opening_book_get_move(opening_book_t *self, zobrist_t hash)
 {
     const book_entry_t *entry = find_entry_const(self, hash);
     if (entry && entry->move_count > 0)
+    {
         return entry->moves[(int)(xorshift64(&self->prng_state) % (uint64_t)entry->move_count)];
+    }
     return move_none();
 }
 
@@ -513,7 +577,9 @@ void opening_book_display_available_moves(const opening_book_t *self, const posi
 {
     const book_entry_t *entry = find_entry_const(self, position_hash(position));
     if (!entry)
+    {
         return;
+    }
 
     // Count occurrences of each move via a simple parallel array.
     move_t seen_moves[256];
@@ -552,7 +618,9 @@ void opening_book_display_available_moves(const opening_book_t *self, const posi
 void opening_book_free(opening_book_t *self)
 {
     for (size_t i = 0; i < self->entry_count; ++i)
+    {
         free(self->entries[i].moves);
+    }
     free(self->entries);
     self->entries        = NULL;
     self->entry_count    = 0;

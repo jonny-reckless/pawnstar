@@ -186,7 +186,7 @@ position_t position_make_move(const position_t *pos, move_t move)
     dst.state_flags ^= POSITION_FLAG_BLACK_TO_MOVE;
     dst.hash ^= BLACK_MOVE_HASH;
     dst.full_move_count += (uint8_t)color; // increments after black's move
-    dst.king_location[color] = bitboard_lsb((dst.kings & position_pieces_of_color(&dst, color)));
+    dst.king_location[color] = lsb((dst.kings & position_pieces_of_color(&dst, color)));
     dst.checkers             = position_attacks_to(&dst, dst.king_location[enemy_of(color)], color);
     return dst;
 }
@@ -229,28 +229,42 @@ position_t position_from_string(const char *fen_string)
         }
     }
     if (*p == ' ')
+    {
         p++;
+    }
 
     // Side to move
     if (*p == 'b')
+    {
         pos.state_flags |= POSITION_FLAG_BLACK_TO_MOVE;
+    }
     while (*p && *p != ' ')
+    {
         p++;
+    }
     if (*p == ' ')
+    {
         p++;
+    }
 
     // Castling rights
     {
         char cr_buf[8] = {0};
         int  i         = 0;
         while (*p && *p != ' ' && i < 7)
+        {
             cr_buf[i++] = *p++;
+        }
         pos.castling_rights = castling_rights_from_fen(cr_buf);
     }
     while (*p && *p != ' ')
+    {
         p++;
+    }
     if (*p == ' ')
+    {
         p++;
+    }
 
     // En passant
     if (*p == '-')
@@ -263,22 +277,32 @@ position_t position_from_string(const char *fen_string)
         char ep_buf[4] = {0};
         int  i         = 0;
         while (*p && *p != ' ' && i < 3)
+        {
             ep_buf[i++] = *p++;
+        }
         pos.en_passant_square = square_from_string(ep_buf);
     }
     while (*p && *p != ' ')
+    {
         p++;
+    }
     if (*p == ' ')
+    {
         p++;
+    }
 
     // Optional half-move clock
     if (*p)
     {
         pos.reversible_move_count = (uint8_t)atoi(p);
         while (*p && *p != ' ')
+        {
             p++;
+        }
         if (*p == ' ')
+        {
             p++;
+        }
     }
 
     // Optional full-move number
@@ -288,8 +312,8 @@ position_t position_from_string(const char *fen_string)
         pos.full_move_count = (uint8_t)(fmn > 0 ? fmn - 1 : 0);
     }
 
-    pos.king_location[WHITE] = bitboard_lsb((pos.kings & pos.white_pieces));
-    pos.king_location[BLACK] = bitboard_lsb((pos.kings & pos.black_pieces));
+    pos.king_location[WHITE] = lsb((pos.kings & pos.white_pieces));
+    pos.king_location[BLACK] = lsb((pos.kings & pos.black_pieces));
     pos.hash                 = position_compute_hash(&pos);
     const color_t color      = position_color_to_move(&pos);
     pos.checkers             = position_attacks_to(&pos, pos.king_location[color], enemy_of(color));
@@ -299,7 +323,9 @@ position_t position_from_string(const char *fen_string)
 void position_to_string(const position_t *pos, char *buf, size_t buf_size)
 {
     if (buf_size == 0)
+    {
         return;
+    }
     char *p   = buf;
     char *end = buf + buf_size - 1;
 
@@ -326,45 +352,67 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
                 bool        is_white = ((pos->white_pieces & sq_bb));
                 const char *chars    = is_white ? " PNBRQK" : " pnbrqk";
                 if (p < end)
+                {
                     *p++ = chars[piece];
+                }
             }
         }
         if (num_empty && p < end)
+        {
             *p++ = (char)('0' + num_empty);
+        }
         if (rank > 0 && p < end)
+        {
             *p++ = '/';
+        }
     }
 
     if (p < end)
+    {
         *p++ = ' ';
+    }
     if (p < end)
+    {
         *p++ = (pos->state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? 'b' : 'w';
+    }
     if (p < end)
+    {
         *p++ = ' ';
+    }
 
     char cr_buf[8];
     castling_rights_to_fen_string(pos->castling_rights, cr_buf, sizeof(cr_buf));
     for (const char *s = cr_buf; *s && p < end; s++)
+    {
         *p++ = *s;
+    }
     if (p < end)
+    {
         *p++ = ' ';
+    }
 
     if (pos->en_passant_square == 0)
     {
         if (p < end)
+        {
             *p++ = '-';
+        }
     }
     else
     {
         char ep_buf[4];
         square_to_string(pos->en_passant_square, ep_buf, sizeof(ep_buf));
         for (const char *s = ep_buf; *s && p < end; s++)
+        {
             *p++ = *s;
+        }
     }
 
     int written = snprintf(p, (size_t)(end - p + 1), " %d %d", pos->reversible_move_count, pos->full_move_count + 1);
     if (written > 0)
+    {
         p += written;
+    }
 
     *p = '\0';
 }
@@ -372,7 +420,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
 bool position_is_draw_by_material(const position_t *pos)
 {
     const bitboard_t occ = (pos->white_pieces | pos->black_pieces);
-    switch (bitboard_pop_count(occ))
+    switch (popcount(occ))
     {
     case 0:
     case 1:
@@ -410,8 +458,8 @@ bool position_is_legal(const position_t *pos)
     const color_t    color      = position_color_to_move(pos);
     const bitboard_t white_king = (pos->kings & pos->white_pieces);
     const bitboard_t black_king = (pos->kings & pos->black_pieces);
-    return bitboard_pop_count(white_king) == 1 && bitboard_pop_count(black_king) == 1 && !(white_king == black_king) &&
-           !(KING_ATTACKS[bitboard_lsb(white_king)] & black_king) &&
+    return popcount(white_king) == 1 && popcount(black_king) == 1 && !(white_king == black_king) &&
+           !(KING_ATTACKS[lsb(white_king)] & black_king) &&
            !position_is_attacked(pos, pos->king_location[enemy_of(color)], color);
 }
 
@@ -491,12 +539,12 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
 
     if (position_is_in_check(pos))
     {
-        if (bitboard_pop_count(pos->checkers) > 1)
+        if (popcount(pos->checkers) > 1)
         {
             // Double check: only king moves are legal (already generated above).
             return moves;
         }
-        const square_t checker_locn = bitboard_lsb(pos->checkers);
+        const square_t checker_locn = lsb(pos->checkers);
         allowed_captures            = pos->checkers;
         allowed_non_captures        = INTERVENING_SQUARES[king_locn][checker_locn];
     }

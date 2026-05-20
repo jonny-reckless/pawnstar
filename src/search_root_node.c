@@ -31,13 +31,19 @@ move_t search_root_node(game_t *game)
     // Check opening book first.
     move_t book_move = opening_book_get_move(&game->book, position_hash(game_current_position(game)));
     if (!move_equals(book_move, move_none()))
+    {
         return book_move;
+    }
 
     move_list_t move_list = position_generate_legal_moves(game_current_position(game));
     if (move_list.size == 0)
+    {
         return move_none();
+    }
     if (move_list.size == 1)
+    {
         return move_list.items[0];
+    }
 
     // Plan time usage.
     int ms_timeout   = 0;
@@ -103,7 +109,9 @@ move_t search_root_node(game_t *game)
     for (int depth = START_DEPTH + 1; depth < MAX_PLY; ++depth)
     {
         if (game->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > game->time_control.depth)
+        {
             break;
+        }
 
         move_list_stable_sort(&move_list);
         variation_list_t child_pv;
@@ -111,7 +119,9 @@ move_t search_root_node(game_t *game)
         int alpha        = ALPHA;
         game->node_count = 0;
         if (best_moves_n < MAX_PLY)
+        {
             best_moves[best_moves_n++] = best_move;
+        }
 
         for (int i = 0; i < move_list.size; ++i)
         {
@@ -120,7 +130,9 @@ move_t search_root_node(game_t *game)
             int score = search_single_move(game, depth, 0, alpha, BETA, move_list.items[i], &pv, i).score;
             move_assign_score(&move_list.items[i], score);
             if (game->is_cancel_pending)
+            {
                 return best_move;
+            }
             if (score > alpha)
             {
                 alpha     = score;
@@ -137,7 +149,9 @@ move_t search_root_node(game_t *game)
                     int written =
                         snprintf(pv_buf + pv_len, sizeof(pv_buf) - (size_t)pv_len, j == 0 ? "%s" : " %s", mv_buf);
                     if (written > 0)
+                    {
                         pv_len += written;
+                    }
                 }
                 printf("info depth %2d score cp %5d time %5lld nodes %8d pv %s\n", depth, alpha,
                        (long long)(chess_clock_elapsed_milliseconds(&game->time_control) - start_ms), game->node_count,
@@ -148,7 +162,9 @@ move_t search_root_node(game_t *game)
 
         int stop_ms = (int)chess_clock_elapsed_milliseconds(&game->time_control);
         if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
+        {
             break;
+        }
 
         if (game->time_control.clock_type == CLOCK_STANDARD)
         {
@@ -160,9 +176,13 @@ move_t search_root_node(game_t *game)
             for (int k = 0; k < best_moves_n; ++k)
             {
                 if (!move_equals(best_moves[k], best_move))
+                {
                     is_best_move_consistent = false;
+                }
                 if (abs_int(move_score(best_moves[k]) - move_score(best_move)) > SCORE_INSTABILITY_THRESHOLD)
+                {
                     is_score_stable = false;
+                }
             }
 
             if (is_best_move_consistent && is_score_stable && (elapsed_ms * 4) > ms_allocated)
@@ -179,7 +199,9 @@ move_t search_root_node(game_t *game)
                 break;
             }
             if (elapsed_ms > ms_allocated)
+            {
                 break;
+            }
         }
     }
     return best_move;

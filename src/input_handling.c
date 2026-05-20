@@ -35,7 +35,9 @@ static void handle_postests(game_t *game, char **args, int argc)
     (void)game;
     int depth = 9;
     if (argc > 1)
+    {
         depth = atoi(args[1]);
+    }
     run_position_tests(depth);
 }
 
@@ -192,7 +194,9 @@ static void handle_position(game_t *game, char **args, int argc)
             for (; j < argc && strcmp(args[j], "moves") != 0; ++j)
             {
                 if (fen_buf[0])
+                {
                     strncat(fen_buf, " ", sizeof(fen_buf) - strlen(fen_buf) - 1);
+                }
                 strncat(fen_buf, args[j], sizeof(fen_buf) - strlen(fen_buf) - 1);
             }
             game_new_game(game, fen_buf);
@@ -200,7 +204,9 @@ static void handle_position(game_t *game, char **args, int argc)
             continue;
         }
         if (strcmp(args[i], "moves") == 0)
+        {
             continue;
+        }
         game_play_move_from_string(game, args[i]);
     }
 }
@@ -239,7 +245,9 @@ static void handle_help(game_t *game, char **args, int argc)
     (void)argc;
     printf("Available commands:\n");
     for (int i = 0; i < NUM_HANDLERS; ++i)
+    {
         printf("%-12s %s\n", handlers[i].name, handlers[i].description);
+    }
     fflush(stdout);
 }
 
@@ -258,7 +266,9 @@ void process_input(game_t *game, const char *line)
         token        = strtok(NULL, " \t\r\n");
     }
     if (argc == 0)
+    {
         return;
+    }
 
     for (int i = 0; i < NUM_HANDLERS; ++i)
     {

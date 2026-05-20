@@ -25,7 +25,11 @@ uint32_t history_table_max_count(const history_table_t *self)
 {
     uint32_t max = 0;
     for (int i = 0; i < MAX_PLY * 4096; ++i)
+    {
         if (self->counts[i] > max)
+        {
             max = self->counts[i];
+        }
+    }
     return max;
 }

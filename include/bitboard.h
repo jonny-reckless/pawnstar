@@ -28,31 +28,31 @@ static inline bitboard_t bitboard_from_coords(int file, int rank)
 // ---------------------------------------------------------------------------
 
 /// @brief Index of the least-significant set bit. Undefined behaviour if @p b is 0.
-static inline square_t bitboard_lsb(bitboard_t b)
+static inline square_t lsb(bitboard_t b)
 {
     return (square_t)__builtin_ctzll(b);
 }
 
 /// @brief Index of the most-significant set bit. Undefined behaviour if @p b is 0.
-static inline square_t bitboard_msb(bitboard_t b)
+static inline square_t msb(bitboard_t b)
 {
     return (square_t)(63 - __builtin_clzll(b));
 }
 
 /// @brief Number of set bits (population count).
-static inline int bitboard_pop_count(bitboard_t b)
+static inline int popcount(bitboard_t b)
 {
     return __builtin_popcountll(b);
 }
 
 /// @brief Return @p b with all bits cleared except the least-significant one.
-static inline bitboard_t bitboard_isolate_lsb(bitboard_t b)
+static inline bitboard_t isolate_lsb(bitboard_t b)
 {
     return b & (0ULL - b);
 }
 
 /// @brief Return @p b with the least-significant bit cleared.
-static inline bitboard_t bitboard_clear_lsb(bitboard_t b)
+static inline bitboard_t clear_lsb(bitboard_t b)
 {
     return b & (b - 1);
 }

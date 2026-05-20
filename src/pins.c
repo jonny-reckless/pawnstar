@@ -20,10 +20,10 @@ void pins_compute(pins_t *self, const position_t *pos)
         const bitboard_t between        = INTERVENING_SQUARES[king_loc][s];
         const bitboard_t between_pieces = (between & occupied);
         const bitboard_t pinned         = (between_pieces & friendly);
-        if ((pinned) && bitboard_pop_count(between_pieces) == 1)
+        if ((pinned) && popcount(between_pieces) == 1)
         {
             self->pinned_pieces |= pinned;
-            self->allowed_squares[bitboard_lsb(pinned)] = (between | bitboard_from_square(s));
+            self->allowed_squares[lsb(pinned)] = (between | bitboard_from_square(s));
         }
     }
 }

@@ -42,7 +42,9 @@ static inline void debug_x_increment(const char *key)
     }
     uint64_t idx = h & (DEBUG_TABLE_SIZE - 1);
     while (debug_dictionary.buckets[idx].occupied && debug_dictionary.buckets[idx].key != key)
+    {
         idx = (idx + 1) & (DEBUG_TABLE_SIZE - 1);
+    }
     if (!debug_dictionary.buckets[idx].occupied)
     {
         debug_dictionary.buckets[idx].key      = key;
@@ -64,7 +66,9 @@ static inline void debug_x_assign(const char *key, int64_t val)
     }
     uint64_t idx = h & (DEBUG_TABLE_SIZE - 1);
     while (debug_dictionary.buckets[idx].occupied && debug_dictionary.buckets[idx].key != key)
+    {
         idx = (idx + 1) & (DEBUG_TABLE_SIZE - 1);
+    }
     debug_dictionary.buckets[idx].key      = key;
     debug_dictionary.buckets[idx].value    = val;
     debug_dictionary.buckets[idx].occupied = 1;

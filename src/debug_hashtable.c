@@ -20,9 +20,13 @@ static int compare_debug_entries(const void *a, const void *b)
     const debug_entry_t *ea = (const debug_entry_t *)a;
     const debug_entry_t *eb = (const debug_entry_t *)b;
     if (!ea->occupied)
+    {
         return eb->occupied ? 1 : 0;
+    }
     if (!eb->occupied)
+    {
         return -1;
+    }
     return strcmp(ea->key, eb->key);
 }
 
@@ -34,7 +38,9 @@ void debug_x_write(void)
 
     printf("********************* DEBUGX *********************\n");
     for (int i = 0; i < DEBUG_TABLE_SIZE && sorted[i].occupied; ++i)
+    {
         printf("%-40s%10lld\n", sorted[i].key, (long long)sorted[i].value);
+    }
     printf("**************************************************\n");
     fflush(stdout);
 }

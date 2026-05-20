@@ -4,7 +4,9 @@
 void move_to_string(move_t m, char *buf, size_t buf_size)
 {
     if (buf_size < 6)
+    {
         return; // "a1b8q\0" = 6 bytes minimum
+    }
     square_to_string(move_from(m), buf, buf_size);
     square_to_string(move_to(m), buf + 2, buf_size - 2);
     piece_t p = move_promoted(m);
