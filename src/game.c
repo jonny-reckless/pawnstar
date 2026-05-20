@@ -9,6 +9,9 @@
 #include "search.h"
 #include "transposition_table.h"
 
+/// @brief Centipawn values for each piece type indexed by piece_t (NONE through KING).
+static const int PIECE_VALUES[7] = {0, 100, 300, 300, 500, 900, 10000};
+
 // ---------------------------------------------------------------------------
 // Worker thread trampoline
 // ---------------------------------------------------------------------------

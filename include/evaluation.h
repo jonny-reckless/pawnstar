@@ -3,8 +3,6 @@
 #include "bitboard.h"
 #include <stdbool.h>
 
-typedef struct game_t game_t;
-
 /// @brief Pawn structure for one color.
 typedef struct
 {
@@ -14,6 +12,8 @@ typedef struct
     bitboard_t doubled_pawns;  ///< A doubled pawn has a friendly pawn in front of it.
     bitboard_t defended_pawns; ///< A defended pawn has a friendly pawn defending it.
 } pawn_structure_t;
+
+typedef struct game game_t;
 
 /// @brief Evaluate the current game position. Returns a score in centipawns from the side-to-move's
 /// perspective. Uses material, piece-square tables, pawn structure, mobility, and king safety.

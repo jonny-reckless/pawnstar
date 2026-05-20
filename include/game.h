@@ -13,7 +13,7 @@
 #include "transposition_table.h"
 
 /// @brief All state required to play and search a game of chess.
-typedef struct game_t
+typedef struct game
 {
     transposition_table_t transposition_table; ///< Main transposition table (64 MB default).
     transposition_table_t quiescent_table;     ///< Separate transposition table for quiescence search.
@@ -26,9 +26,6 @@ typedef struct game_t
     bool                  worker_running;      ///< True while worker_thread is alive and joinable.
     position_stack_t      positions;           ///< Full position history (used for repetition detection).
 } game_t;
-
-/// @brief Centipawn values for each piece type indexed by piece_t (NONE through KING).
-static const int PIECE_VALUES[7] = {0, 100, 300, 300, 500, 900, 10000};
 
 /// @brief Allocate and initialize all sub-components (transposition tables, history, etc.).
 void game_init(game_t *self);
