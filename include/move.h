@@ -1,307 +1,320 @@
 #pragma once
-/// @file Types and functions for using chess moves.
-
-#include <algorithm>
-#include <cstdint>
-#include <string>
-#include <string_view>
+/// @file Types and functions for chess moves.
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "color.h"
 #include "constants.h"
 #include "piece.h"
 #include "square.h"
-#include "stack_list.h"
 
-/// @brief Class for representing a chess move.
-/// A move is 64 bits in size.
-/// Bits are as follows:
-///  0 -  5: to square
-///  6 - 11: from square
-/// 12 - 14: moving piece
-/// 15 - 17: captured piece (in the case of capture moves)
-/// 18 - 21: move type
-/// 22 - 22: is checking flag (move gives check)
-/// 32 - 63: score (when move has score assigned)
-class Move
+/// @brief Classification of a chess move.
+typedef enum
 {
-  private:
-    static const int64_t kIsChecking = 1 << 22;
-    int64_t              val;
+    MOVE_NON_CAPTURE      = 0, ///< Quiet move (no capture, no special action).
+    MOVE_CAPTURE          = 1, ///< Normal capture.
+    MOVE_PROMOTION_KNIGHT = 2, ///< Promotion to knight (value == KNIGHT).
+    MOVE_PROMOTION_BISHOP = 3, ///< Promotion to bishop (value == BISHOP).
+    MOVE_PROMOTION_ROOK   = 4, ///< Promotion to rook   (value == ROOK).
+    MOVE_PROMOTION_QUEEN  = 5, ///< Promotion to queen  (value == QUEEN).
+    MOVE_PAWN_DOUBLE_PUSH = 6, ///< Pawn advances two squares, setting en-passant square.
+    MOVE_EP_CAPTURE       = 7, ///< En-passant capture.
+    MOVE_CASTLING         = 8, ///< King-side or queen-side castling.
+} move_type_t;
 
-  public:
-    /// @brief Move types.
-    enum Type : uint8_t
-    {
-        kNonCapture,                ///< Regular non capture move.
-        kCapture,                   ///< Capture move.
-        kPromotionKnight = kKnight, ///< Promotion to knight.
-        kPromotionBishop = kBishop, ///< Promotion to bishop.
-        kPromotionRook   = kRook,   ///< Promotion to rook.
-        kPromotionQueen  = kQueen,  ///< Promotion to queen.
-        kPawnDoublePush,            ///< Pawn double push (affects en passant).
-        kEpCapture,                 ///< En passant capture.
-        kCastling,                  ///< Castling.
-    };
+/// @brief A chess move packed into 64 bits.
+/// Bits  0– 5: destination square
+/// Bits  6–11: origin square
+/// Bits 12–14: moving piece (piece_t)
+/// Bits 15–17: captured piece (piece_t; NONE for non-captures)
+/// Bits 18–21: move type (move_type_t)
+/// Bit  22:    gives-check flag
+/// Bits 32–63: sort score (signed, used by move ordering)
+typedef int64_t move_t;
 
-    /// @brief Default constructor; does not initialize the move object, so that arrays of moves can be quickly
-    /// created without having to construct initialize each move.
-    constexpr Move()
-    {
-    }
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
 
-    /// @brief Copy constructor. Treat the move object as a 64 bit int for efficiency.
-    /// @param that Move to construct from.
-    constexpr Move(const Move &that) : val(that.val)
-    {
-    }
-
-    /// @brief Assignment. Treat the move object as a 64 bit int for efficiency.
-    /// @param that Value to be assigned.
-    /// @return Assignee move.
-    constexpr Move &operator=(const Move &that)
-    {
-        val = that.val;
-        return *this;
-    }
-
-    /// @brief Equality operator. Compare from, to, piece, captured, type fields (22 bits).
-    /// @param that Other move to compare.
-    /// @return true if moves are equivalent.
-    constexpr bool operator==(const Move &that) const
-    {
-        return (val & 0x3FFFFF) == (that.val & 0x3FFFFF);
-    }
-
-    /// @brief Less than operator. Used to put moves into a set.
-    /// @param that Other move to compare.
-    /// @return true if move is less than that.
-    constexpr bool operator<(const Move &that) const
-    {
-        return val < that.val;
-    }
-
-    /// @brief Destination square.
-    /// @return Square index of move to.
-    constexpr Square to() const
-    {
-        return Square{(uint8_t)(val & 0x3F)};
-    }
-
-    /// @brief Source square.
-    /// @return Square index of move from.
-    constexpr Square from() const
-    {
-        return Square{(uint8_t)((val >> 6) & 0x3F)};
-    }
-
-    /// @brief Type.
-    /// @return Move type.
-    constexpr Type type() const
-    {
-        return Type{(uint8_t)((val >> 18) & 0x0F)};
-    }
-
-    /// @brief Moving piece
-    /// @return the piece.
-    constexpr Piece piece() const
-    {
-        return Piece{(uint8_t)((val >> 12) & 0x07)};
-    }
-
-    /// @brief Captured piece.
-    /// @return the captured piece or kNone if not a capture move.
-    constexpr Piece captured() const
-    {
-        return Piece{(uint8_t)((val >> 15) & 0x07)};
-    }
-
-    /// @brief Promoted piece.
-    /// @return In the case of a pawn promotion, the piece to be promoted.
-    constexpr Piece promoted() const
-    {
-        switch (type())
-        {
-        case kNonCapture:
-        case kCapture:
-        case kPawnDoublePush:
-        case kEpCapture:
-        case kCastling:
-            return Piece::kNone;
-        case kPromotionKnight:
-            return kKnight;
-        case kPromotionBishop:
-            return kBishop;
-        case kPromotionRook:
-            return kRook;
-        case kPromotionQueen:
-            return kQueen;
-        }
-        return Piece::kNone;
-    }
-
-    /// @brief The move score.
-    /// @return Move score (usually in centipawns).
-    constexpr int score() const
-    {
-        return (int)(val >> 32);
-    }
-
-    /// @brief Create a from-to bits value for indexing into history tables.
-    /// @return 12 bit from-to combination.
-    constexpr int from_to() const
-    {
-        return val & 0xFFF;
-    }
-
-    /// @brief Does this move give check?
-    /// @return true if move is checking.
-    constexpr bool IsChecking() const
-    {
-        return !!(val & kIsChecking);
-    }
-
-    /// @brief Assign the score to the move.
-    /// @param score Score to be assigned.
-    constexpr void AssignScore(int score)
-    {
-        val = (val & 0xFFFFFFFF) | (int64_t)(score) << 32;
-    }
-
-    /// @brief Set the flag that indicates this move gives check.
-    constexpr void GivesCheck()
-    {
-        val |= kIsChecking;
-    }
-
-    /// @brief Null move.
-    /// @return Special sentinel move that indicates not a move.
-    constexpr static Move None()
-    {
-        return Move{0};
-    }
-
-    /// @brief Create a non capture move.
-    /// @param from From square.
-    /// @param to To square.
-    /// @return The move.
-    constexpr static Move NonCapture(Square from, Square to, Piece piece)
-    {
-        return Move{from, to, piece};
-    }
-
-    /// @brief Create a capture move.
-    /// @param from From square.
-    /// @param to To square.
-    /// @return The move.
-    constexpr static Move Capture(Square from, Square to, Piece piece, Piece captured)
-    {
-        return Move{from, to, piece, Type::kCapture, captured};
-    }
-
-    /// @brief Create a pawn promotion capture move.
-    /// @param from From square.
-    /// @param to To square.
-    /// @param promoted Piece to be promoted to.
-    /// @return The move.
-    constexpr static Move Promotion(Square from, Square to, Piece promoted, Piece captured)
-    {
-        return Move{from, to, kPawn, (Type)promoted, captured};
-    }
-
-    /// @brief Create a pawn promotion non capture move.
-    /// @param from From square.
-    /// @param to To square.
-    /// @param promoted Piece to be promoted to.
-    /// @return The move.
-    constexpr static Move Promotion(Square from, Square to, Piece promoted)
-    {
-        return Move{from, to, kPawn, (Type)promoted};
-    }
-
-    /// @brief Create a castling move.
-    /// @param from King source square.
-    /// @param to King destination square.
-    /// @return The move.
-    constexpr static Move Castling(Square from, Square to)
-    {
-        return Move{from, to, kKing, Type::kCastling};
-    }
-
-    /// @brief Create an en passant capture move.
-    /// @param from Capturing pawn from square.
-    /// @param to Capturing pawn to square.
-    /// @return The move.
-    constexpr static Move EpCapture(Square from, Square to)
-    {
-        return Move{from, to, kPawn, Type::kEpCapture, kPawn};
-    }
-
-    /// @brief Create a pawn double push move.
-    /// @param from From square.
-    /// @param to To square.
-    /// @return The move.
-    constexpr static Move DoublePush(Square from, Square to)
-    {
-        return Move{from, to, kPawn, Type::kPawnDoublePush};
-    }
-
-    /// @brief Used for putting moves in std library hashed containers.
-    /// @param move Move to hash.
-    /// @return Hashed value of move.
-    constexpr std::size_t operator()(const Move &move) const
-    {
-        return (std::size_t)move.val;
-    }
-
-    /// @brief Convert a move to an algebraic notation string, e.g. "e1g1", "a7a8q".
-    /// @return Move string.
-    constexpr const std::string ToString() const
-    {
-        std::string result = from().ToString() + to().ToString();
-        if (promoted() != Piece::kNone)
-        {
-            result.push_back(" pnbrqk"[promoted()]);
-        }
-        return result;
-    }
-
-  private:
-    constexpr Move(Square from, Square to, Piece piece) : val(to | (from << 6) | (piece << 12))
-    {
-    }
-
-    constexpr Move(Square from, Square to, Piece piece, Type type)
-        : val(to | (from << 6) | (piece << 12) | (type << 18))
-    {
-    }
-
-    constexpr Move(Square from, Square to, Piece piece, Type type, Piece captured)
-        : val(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
-    {
-    }
-
-    constexpr Move(int64_t v) : val(v)
-    {
-    }
-};
-
-static_assert(sizeof(Move) == sizeof(uint64_t));
-
-/// @brief A list of moves, typically used to hold the list of legal moves available from a given position.
-/// A StackList is much faster than a std::vector, and more convenient than a raw std::array.
-typedef StackList<Move, kMaxMovesPerPosition> MoveList;
-
-/// @brief Sort moves best first, i.e. in descending score order.
-/// @tparam is_stable_sort True for stable (slower) sort, only required when processing the root node of the search.
-/// @param moves List of moves to be sorted.
-template <bool is_stable_sort> constexpr void SortMoves(MoveList &moves)
+/// @brief The null move (used as a sentinel; all fields zero).
+static inline move_t move_none(void)
 {
-    if constexpr (is_stable_sort)
+    return 0;
+}
+
+/// @brief Build a move from @p from, @p to and @p piece with no special flags.
+static inline move_t move_make_raw(square_t from, square_t to, piece_t piece)
+{
+    return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12);
+}
+
+/// @brief Build a move with an explicit @p type field.
+static inline move_t move_make_with_type(square_t from, square_t to, piece_t piece, move_type_t type)
+{
+    return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12) | ((int64_t)type << 18);
+}
+
+static inline move_t move_make_capture_(square_t from, square_t to, piece_t piece, move_type_t type, piece_t captured)
+{
+    return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12) | ((int64_t)captured << 15) |
+           ((int64_t)type << 18);
+}
+
+/// @brief Quiet (non-capture) move.
+static inline move_t move_non_capture(square_t from, square_t to, piece_t piece)
+{
+    return move_make_raw(from, to, piece);
+}
+
+/// @brief Normal capture move.
+static inline move_t move_capture(square_t from, square_t to, piece_t piece, piece_t captured)
+{
+    return move_make_capture_(from, to, piece, MOVE_CAPTURE, captured);
+}
+
+/// @brief Promotion move, optionally with a capture (@p captured may be NONE).
+static inline move_t move_promotion(square_t from, square_t to, piece_t promoted, piece_t captured)
+{
+    return move_make_capture_(from, to, PAWN, (move_type_t)promoted, captured);
+}
+
+/// @brief Quiet promotion (no capture).
+static inline move_t move_promotion_quiet(square_t from, square_t to, piece_t promoted)
+{
+    return move_make_with_type(from, to, PAWN, (move_type_t)promoted);
+}
+
+/// @brief Castling move (king's from/to squares; the rook move is implicit).
+static inline move_t move_castling(square_t from, square_t to)
+{
+    return move_make_with_type(from, to, KING, MOVE_CASTLING);
+}
+
+/// @brief En-passant capture (the captured pawn's square is derived from @p to).
+static inline move_t move_ep_capture(square_t from, square_t to)
+{
+    return move_make_capture_(from, to, PAWN, MOVE_EP_CAPTURE, PAWN);
+}
+
+/// @brief Pawn double-push (sets en-passant square to the intermediate square).
+static inline move_t move_double_push(square_t from, square_t to)
+{
+    return move_make_with_type(from, to, PAWN, MOVE_PAWN_DOUBLE_PUSH);
+}
+
+// ---------------------------------------------------------------------------
+// String-literal square conveniences (parse "e4" at call site)
+// ---------------------------------------------------------------------------
+
+/// @brief Castling move constructed from square-name strings (e.g. @c "e1", @c "g1").
+static inline move_t move_castling_str(const char *from_str, const char *to_str)
+{
+    return move_castling(square_from_string(from_str), square_from_string(to_str));
+}
+
+// ---------------------------------------------------------------------------
+// Accessors
+// ---------------------------------------------------------------------------
+
+/// @brief Destination square.
+static inline square_t move_to(move_t m)
+{
+    return (square_t)((uint8_t)(m & 0x3F));
+}
+
+/// @brief Origin square.
+static inline square_t move_from(move_t m)
+{
+    return (square_t)((uint8_t)((m >> 6) & 0x3F));
+}
+
+/// @brief Move classification.
+static inline move_type_t move_type(move_t m)
+{
+    return (move_type_t)((m >> 18) & 0x0F);
+}
+
+/// @brief The piece being moved.
+static inline piece_t move_piece(move_t m)
+{
+    return (piece_t)((m >> 12) & 0x07);
+}
+
+/// @brief The piece captured (NONE if non-capture; PAWN for en-passant).
+static inline piece_t move_captured(move_t m)
+{
+    return (piece_t)((m >> 15) & 0x07);
+}
+
+/// @brief Promotion target piece (NONE if not a promotion).
+static inline piece_t move_promoted(move_t m)
+{
+    switch (move_type(m))
     {
-        std::ranges::stable_sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
+    case MOVE_PROMOTION_KNIGHT:
+        return KNIGHT;
+    case MOVE_PROMOTION_BISHOP:
+        return BISHOP;
+    case MOVE_PROMOTION_ROOK:
+        return ROOK;
+    case MOVE_PROMOTION_QUEEN:
+        return QUEEN;
+    default:
+        return NONE;
     }
-    else
-    {
-        std::ranges::sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
-    }
+}
+
+/// @brief Sort score (used by move ordering; higher = searched first).
+static inline int move_score(move_t m)
+{
+    return (int)(m >> 32);
+}
+
+/// @brief Combined from+to index (12 bits) used as a history-table key.
+static inline int move_from_to(move_t m)
+{
+    return (int)(m & 0xFFF);
+}
+
+/// @brief True if the gives-check flag is set.
+static inline bool move_is_checking(move_t m)
+{
+    return !!(m & (1 << 22));
+}
+
+// ---------------------------------------------------------------------------
+// Mutators
+// ---------------------------------------------------------------------------
+
+/// @brief Overwrite the sort score in @p m (bits 32–63); lower bits are preserved.
+static inline void move_assign_score(move_t *m, int score)
+{
+    *m = (*m & 0xFFFFFFFF) | ((int64_t)score << 32);
+}
+
+/// @brief Set the gives-check flag on @p m.
+static inline void move_gives_check(move_t *m)
+{
+    *m |= (1 << 22);
+}
+
+// ---------------------------------------------------------------------------
+// Comparison / hashing
+// ---------------------------------------------------------------------------
+
+/// @brief True if @p a and @p b represent the same chess move (score bits ignored).
+static inline bool move_equals(move_t a, move_t b)
+{
+    return (a & 0x3FFFFF) == (b & 0x3FFFFF);
+}
+
+/// @brief Ordering by raw value (including score); used for sort comparators.
+static inline bool move_less_than(move_t a, move_t b)
+{
+    return a < b;
+}
+
+/// @brief Hash of a move (for use in hash tables).
+static inline size_t move_hash(move_t m)
+{
+    return (size_t)m;
+}
+
+// ---------------------------------------------------------------------------
+// String representation (caller provides buf, at least 6 bytes)
+// ---------------------------------------------------------------------------
+
+/// @brief Write the move in UCI long-algebraic notation (e.g. "e2e4", "e7e8q") into @p buf.
+void move_to_string(move_t m, char *buf, size_t buf_size);
+
+// ---------------------------------------------------------------------------
+// move_list_t — fixed-capacity stack-allocated list of moves
+// ---------------------------------------------------------------------------
+
+/// @brief A stack-allocated list of up to MAX_MOVES_PER_POSITION moves.
+typedef struct
+{
+    move_t items[MAX_MOVES_PER_POSITION]; ///< Move storage.
+    int    size;                          ///< Number of moves currently in the list.
+} move_list_t;
+
+/// @brief Remove all moves from the list.
+static inline void move_list_clear(move_list_t *self)
+{
+    self->size = 0;
+}
+
+/// @brief Append @p m to the end of the list. No bounds check.
+static inline void move_list_push_back(move_list_t *self, move_t m)
+{
+    self->items[self->size++] = m;
+}
+
+/// @brief Remove and return the last move.
+static inline move_t move_list_pop_back(move_list_t *self)
+{
+    return self->items[--self->size];
+}
+
+/// @brief Pointer to the last move (not removed).
+static inline move_t *move_list_back(move_list_t *self)
+{
+    return &self->items[self->size - 1];
+}
+
+/// @brief Return move at index @p i by value.
+static inline move_t move_list_get(const move_list_t *self, int i)
+{
+    return self->items[i];
+}
+
+/// @brief Return a pointer to the move at index @p i.
+static inline move_t *move_list_get_ptr(move_list_t *self, int i)
+{
+    return &self->items[i];
+}
+
+/// @brief Sort moves descending by score (unstable).
+void move_list_sort(move_list_t *moves);
+
+/// @brief Sort moves descending by score (stable — preserves relative order of equal-score moves).
+void move_list_stable_sort(move_list_t *moves);
+
+// ---------------------------------------------------------------------------
+// variation_list_t — a line of moves up to MAX_PLY deep (principal variation)
+// ---------------------------------------------------------------------------
+
+/// @brief A sequence of moves up to MAX_PLY deep, used to store the principal variation.
+typedef struct
+{
+    move_t items[MAX_PLY]; ///< Move storage.
+    int    size;           ///< Number of moves in the variation.
+} variation_list_t;
+
+/// @brief Remove all moves from the variation.
+static inline void variation_list_clear(variation_list_t *self)
+{
+    self->size = 0;
+}
+
+/// @brief Append @p m to the end of the variation.
+static inline void variation_list_push_back(variation_list_t *self, move_t m)
+{
+    self->items[self->size++] = m;
+}
+
+/// @brief Return the move at index @p i.
+static inline move_t variation_list_get(const variation_list_t *self, int i)
+{
+    return self->items[i];
+}
+
+/// @brief Copy @p src into @p dst, prepending @p best_move as the first entry.
+static inline void copy_variation(variation_list_t *dst, const variation_list_t *src, move_t best_move)
+{
+    dst->size = 0;
+    variation_list_push_back(dst, best_move);
+    for (int i = 0; i < src->size && dst->size < MAX_PLY; i++)
+        variation_list_push_back(dst, src->items[i]);
 }

@@ -1,3 +1,7 @@
+/// @file Bratko-Kopec search position tests.
+
+#include <stdio.h>
+
 #include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
@@ -5,16 +9,8 @@
 #include "search.h"
 #include "transposition_table.h"
 
-#include <array>
-#include <format>
-#include <iostream>
-#include <string_view>
-
-using std::string_view;
-
-/// @brief Standard Bratko Kopec test positions in FEN format.
-constexpr std::array POSITION_TESTS{
-    "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
+static const char *POSITION_TESTS[] = {
+    "1k1r4/pp1b1R02/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
     "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -",
     "rnbqkb1r/p3pppp/1p6/2ppP3/3N4/2P5/PPP1QPPP/R1B1KB1R w KQkq -",
@@ -40,30 +36,45 @@ constexpr std::array POSITION_TESTS{
     "r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - -",
 };
 
-/// @brief Run the Bratko Kopec position tests.
-/// @param depth Search depth.
-void RunPositionTests(int depth)
+static const int NUM_POSITION_TESTS = (int)(sizeof(POSITION_TESTS) / sizeof(POSITION_TESTS[0]));
+
+void run_position_tests(int depth)
 {
-    Game       game;
-    const auto start_ms = game.time_control.ElapsedMilliseconds();
-    for (string_view test_pos : POSITION_TESTS)
+    game_t outer_game;
+    game_init(&outer_game);
+    int64_t start_ms = chess_clock_elapsed_milliseconds(&outer_game.time_control);
+
+    for (int t = 0; t < NUM_POSITION_TESTS; ++t)
     {
-        Game game;
-        game.NewGame(test_pos);
-        game.time_control.clock_type = ChessClock::kFixedDepth;
+        game_t game;
+        game_init(&game);
+        game_new_game(&game, POSITION_TESTS[t]);
+        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
         game.time_control.depth      = depth;
-        std::cout << std::format("\n{}\n", game.CurrentPosition().ToString());
-        DebugXClear();
-        SearchRootNode(game);
+
+        char pos_buf[128];
+        position_to_string(game_current_position(&game), pos_buf, sizeof(pos_buf));
+        printf("\n%s\n", pos_buf);
+        fflush(stdout);
+
+        debug_x_clear();
+        search_root_node(&game);
+
 #if DEBUGX
-        auto [count, percent]  = game.transposition_table.UsageStats();
-        auto max_history_count = game.history_table.MaxCount();
-        ASSIGN("history move max count", max_history_count);
-        ASSIGN("table usage count", count);
-        ASSIGN("table usage percent", percent);
+        size_t count;
+        int    percent;
+        transposition_table_usage_stats(&game.transposition_table, &count, &percent);
+        uint32_t max_history = history_table_max_count(&game.history_table);
+        ASSIGN("history move max count", (int64_t)max_history);
+        ASSIGN("table usage count", (int64_t)count);
+        ASSIGN("table usage percent", (int64_t)percent);
 #endif
-        DebugXWrite();
+        debug_x_write();
+        game_free(&game);
     }
-    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds",
-                             game.time_control.ElapsedMilliseconds() - start_ms);
+
+    printf("%-40s%10lld\n", "total elapsed milliseconds",
+           (long long)(chess_clock_elapsed_milliseconds(&outer_game.time_control) - start_ms));
+    fflush(stdout);
+    game_free(&outer_game);
 }

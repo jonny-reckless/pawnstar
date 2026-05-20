@@ -1,33 +1,43 @@
 #pragma once
-#include <cstdint>
-#include <map>
-#include <random>
-#include <sstream>
-#include <string_view>
-#include <vector>
+/// @file Opening book: maps Zobrist hashes to the set of moves playable from each known position.
+#include <stddef.h>
+#include <stdint.h>
 
-#include "generated_data.h"
 #include "move.h"
 
-class Position;
+typedef struct position_t position_t;
 
-/// @brief The opening book is stored as a map, indexed by the Zobrist hash of the position, containing a vector of
-/// Moves which are available from that position. The same move may be in the moves vector multiple times if it appears
-/// in several lines of play, i.e. the frequency of occurence of a move in the list is proportional to the liklihood
-/// that we want to play it.
-class OpeningBook
+/// @brief One entry in the opening book: a position hash and the moves available from it.
+typedef struct
 {
-  public:
-    OpeningBook();
-    bool Initialize(std::string_view filename);
-    void DisplayAvailableMoves(const Position &position);
-    Move GetMove(zobrist_t hash);
-    void Free();
+    zobrist_t key;        ///< Zobrist hash of the position.
+    move_t   *moves;      ///< Heap-allocated array of book moves.
+    int       move_count; ///< Number of moves in the array.
+    int       move_cap;   ///< Allocated capacity of the moves array.
+} book_entry_t;
 
-  private:
-    bool                                   InitializeFromStream(std::istream &ss);
-    bool                                   ParseLineOfPlay(std::string_view line);
-    bool                                   ParsePgn(std::istream &is);
-    std::map<zobrist_t, std::vector<Move>> book_;
-    std::mt19937                           prng_;
-};
+/// @brief The complete opening book.
+/// During initialization entries are accumulated then sorted by key for O(log n) lookup via bsearch.
+typedef struct
+{
+    book_entry_t *entries;        ///< Array of entries, sorted by key after initialization.
+    size_t        entry_count;    ///< Number of entries currently stored.
+    size_t        entry_capacity; ///< Allocated capacity of the entries array.
+    uint64_t      prng_state;     ///< xorshift64 seed for random move selection.
+} opening_book_t;
+
+/// @brief Initialize an empty opening book (no memory allocated yet).
+void opening_book_init(opening_book_t *self);
+
+/// @brief Load opening lines from @p filename (plain-text format, one line of play per line).
+/// Returns true on success.
+bool opening_book_initialize(opening_book_t *self, const char *filename);
+
+/// @brief Print all book moves available for @p position to stdout.
+void opening_book_display_available_moves(const opening_book_t *self, const struct position_t *position);
+
+/// @brief Return a randomly-selected book move for position @p hash, or move_none() if not in book.
+move_t opening_book_get_move(opening_book_t *self, zobrist_t hash);
+
+/// @brief Free all heap memory owned by the opening book.
+void opening_book_free(opening_book_t *self);

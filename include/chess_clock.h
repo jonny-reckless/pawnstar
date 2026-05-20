@@ -1,43 +1,36 @@
 #pragma once
-/// @file Chess clock.
-#include <chrono>
-#include <cstdint>
+/// @file Chess clock: tracks elapsed time and enforces time-control limits.
+#include <stdint.h>
+#include <time.h>
 
-/// @brief Clock and time controls.
-class ChessClock
+/// @brief Time control mode for the current game.
+typedef enum
 {
-  public:
-    /// @brief Time control chess clock types.
-    enum ClockType
-    {
-        kStandard,   ///< N moves to be made in a specified time.
-        kFixedDepth, ///< Search to depth D on every move.
-        kFixedTime,  ///< Search for N milliseconds on every move.
-        kInfinite,   ///< Keep searching until told to stop.
-    };
+    CLOCK_STANDARD,    ///< N moves must be made within a total time budget.
+    CLOCK_FIXED_DEPTH, ///< Search to a fixed depth on every move.
+    CLOCK_FIXED_TIME,  ///< Search for a fixed number of milliseconds on every move.
+    CLOCK_INFINITE,    ///< Search indefinitely until a UCI @c stop command arrives.
+} clock_type_t;
 
-    ChessClock()
-        : clock_type{kStandard}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
-          start_time_{std::chrono::system_clock::now()}
-    {
-    }
+/// @brief Tracks elapsed time and time-control parameters for one game.
+typedef struct
+{
+    clock_type_t    clock_type;          ///< Active time control mode.
+    int64_t         hard_stop_ms;        ///< Absolute deadline in elapsed milliseconds; search must stop by this time.
+    int             ms_remaining;        ///< Milliseconds remaining in the current time period.
+    int             num_moves_remaining; ///< Moves remaining before the next time control (CLOCK_STANDARD only).
+    int             depth;               ///< Fixed search depth (CLOCK_FIXED_DEPTH only).
+    struct timespec start_time;          ///< Monotonic timestamp when the clock was last started.
+} chess_clock_t;
 
-    ClockType clock_type;          ///< The current clock type.
-    int64_t   hard_stop_ms;        ///< Wall clock time to hard stop searching and move
-    int       ms_remaining;        ///< Number of ms remaining in this clock period.
-    int       num_moves_remaining; ///< Number of moves remaining in this clock period.
-    int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
+/// @brief Initialize the clock with CLOCK_INFINITE and record the start time.
+void chess_clock_init(chess_clock_t *self);
 
-    int64_t ElapsedMicroseconds()
-    {
-        return duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start_time_).count();
-    }
+/// @brief Return the number of microseconds elapsed since the clock was started.
+int64_t chess_clock_elapsed_microseconds(const chess_clock_t *self);
 
-    int64_t ElapsedMilliseconds()
-    {
-        return ElapsedMicroseconds() / 1000;
-    }
-
-  private:
-    std::chrono::system_clock::time_point start_time_;
-};
+/// @brief Return the number of milliseconds elapsed since the clock was started.
+static inline int64_t chess_clock_elapsed_milliseconds(const chess_clock_t *self)
+{
+    return chess_clock_elapsed_microseconds(self) / 1000;
+}

@@ -1,19 +1,16 @@
 #pragma once
 /// @file Chess piece colors.
+#include <stdint.h>
 
-#include <cstdint>
-
-/// @brief Piece colors.
-enum Color : uint8_t
+/// @brief piece_t colors.
+typedef enum
 {
-    kWhite,
-    kBlack,
-};
+    WHITE = 0,
+    BLACK = 1,
+} color_t;
 
 /// @brief Return the enemy of a color.
-/// @param color the color
-/// @return The opposite color
-constexpr Color EnemyOf(Color color)
+static inline color_t enemy_of(color_t color)
 {
-    return color == Color::kWhite ? Color::kBlack : Color::kWhite;
+    return color == WHITE ? BLACK : WHITE;
 }

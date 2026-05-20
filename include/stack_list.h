@@ -4,7 +4,7 @@
 
 /// @brief Fixed size, very simple stack storage container for lists of moves.
 /// Considerably faster than std::vector due to not allocating data on the heap. More convenient than a raw std::array
-/// for insertion, sorting and iteration. Perft speed is over 2x faster using this in place of std::vector for move
+/// for insertion, sorting and iteration. perft speed is over 2x faster using this in place of std::vector for move
 /// generation, even when using reserve to preallocate the heap buffer for the vector. NB: There is no buffer overflow
 /// protection, so use with caution.
 template <typename T, int N> class StackList

@@ -1,33 +1,28 @@
-/// @file functions to search for the best move.
+/// @file Search entry points: alpha-beta, quiescence, and root-node search.
 #pragma once
 
 #include "constants.h"
 #include "game.h"
 #include "move.h"
-#include "stack_list.h"
 
-/// @brief A variation (typically principal variation) is a line of play or series of moves.
-using Variation = StackList<Move, kMaxPly>;
-
-struct SingleMoveResult
+/// @brief Result of searching a single move at the root node.
+typedef struct
 {
-    int  score;
-    bool is_checking;
-};
+    int  score;       ///< Alpha-beta score from the child position's perspective.
+    bool is_checking; ///< True if the move gives check.
+} single_move_result_t;
 
-Move             SearchRootNode(Game &game);
-int              Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv);
-SingleMoveResult SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
-                                  int move_index);
-int              SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta);
+/// @brief Search from the root position and return the best move found.
+/// Drives iterative deepening and outputs UCI @c info lines.
+move_t search_root_node(game_t *game);
 
-/// @brief When the PV changes we need to copy the new PV up the tree recursively.
-/// @param dst Destination PV.
-/// @param src Source PV.
-/// @param best_move New best move at this position.
-constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &best_move)
-{
-    dst.clear();
-    dst.push_back(best_move);
-    std::copy(src.begin(), src.end(), std::back_inserter(dst));
-}
+/// @brief Alpha-beta search. Returns the score for the side to move.
+/// Uses the transposition table, null-move pruning, and late-move reduction.
+int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list_t *parent_pv);
+
+/// @brief Play @p move, search the resulting position to @p depth, then undo the move.
+single_move_result_t search_single_move(game_t *game, int depth, int ply, int alpha, int beta, move_t move,
+                                        variation_list_t *pv, int move_index);
+
+/// @brief Quiescence search: extends with captures only until a quiet position is reached.
+int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta);

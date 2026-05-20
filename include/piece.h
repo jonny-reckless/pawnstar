@@ -1,16 +1,15 @@
 #pragma once
 /// @file Chess piece types.
+#include <stdint.h>
 
-#include <cstdint>
-
-/// @brief Chess pieces.
-enum Piece : uint8_t
+/// @brief Chess piece type. Values 1–6 match the bit encoding in move_t.
+typedef enum
 {
-    kNone,
-    kPawn,
-    kKnight,
-    kBishop,
-    kRook,
-    kQueen,
-    kKing,
-};
+    NONE   = 0, ///< No piece / empty square.
+    PAWN   = 1,
+    KNIGHT = 2,
+    BISHOP = 3,
+    ROOK   = 4,
+    QUEEN  = 5,
+    KING   = 6,
+} piece_t;

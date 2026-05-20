@@ -1,314 +1,150 @@
 #pragma once
-/// @file Types, values and functions for using chess Bitboards.
-
-#include <cstdint>
-#include <string>
-
+/// @file Types, values and functions for chess bitboards.
 #include "square.h"
+#include <stddef.h>
+#include <stdint.h>
 
-/// @brief Class to represent a bitboard.
-/// A Bitboard is a set-wise interpretation of a 64-bit unsigned integer, with each bit mapping to a square on the
-/// chessboard.
-///
-/// For example:
-///
-/// The set of squares occupied by pawns
-/// The set of squares occupied by a black piece
-/// The set of squares to which a knight on e4 may move
-/// The set of squares attacked by black queens
-/// The set of squares containing a piece checking the white king
-///
-/// If the bit is 1, then the corresponding square is a member of that set.
-///
-/// Bit  0 maps to square a1 (LSB)
-/// Bit  7 maps to square h1
-/// Bit 56 maps to square a8
-/// Bit 63 maps to square h8 (MSB)
-///
-/// This is commonly referred to as LERF (little endian rank file mapping).
-class Bitboard
+/// @brief A 64-bit set of squares. Bit 0 → a1 (LSB), bit 63 → h8 (MSB). LERF mapping.
+typedef uint64_t bitboard_t;
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+/// @brief Return a bitboard with only square @p s set.
+static inline bitboard_t bitboard_from_square(square_t s)
 {
-  private:
-    uint64_t v; ///< The bitboard value.
+    return 1ULL << s;
+}
 
-    static constexpr uint64_t kNotFileA = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
-    static constexpr uint64_t kNotFileH = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
+/// @brief Return a bitboard with only the square at (file, rank) set.
+static inline bitboard_t bitboard_from_coords(int file, int rank)
+{
+    return 1ULL << (file + 8 * rank);
+}
 
-  public:
-    /// @brief Default constructor.
-    constexpr Bitboard()
-    {
-    }
-    /// @brief Constructor.
-    /// @param v Value to assign.
-    constexpr Bitboard(uint64_t v) : v(v)
-    {
-    }
-    /// @brief Constructor.
-    /// @param location Square index to convert to Bitboard.
-    constexpr Bitboard(Square location) : v(1ull << location)
-    {
-    }
-    /// @brief Constructor.
-    /// @param x File index (0,7)
-    /// @param y Rank index (0,7)
-    constexpr Bitboard(int x, int y) : v(1ull << (x + 8 * y))
-    {
-    }
-    /// @brief Copy constructor.
-    /// @param that Bitboard to be copied.
-    constexpr Bitboard(const Bitboard &that) : v(that.v)
-    {
-    }
-    /// @brief Assignment operator.
-    /// @param that Source Bitboard.
-    /// @return Assignee.
-    constexpr Bitboard &operator=(Bitboard that)
-    {
-        v = that.v;
-        return *this;
-    }
-    /// @brief Convert Bitboard to 8 x 8 string for debug purposes.
-    /// @return Chess board string containing 1s and 0s.
-    constexpr std::string ToString() const
-    {
-        std::string result;
-        for (int y = 7; y >= 0; --y)
-        {
-            for (int x = 0; x < 8; ++x)
-            {
-                if (v & (1ull << (x + 8 * y)))
-                {
-                    result.push_back('1');
-                }
-                else
-                {
-                    result.push_back('0');
-                }
-            }
-            result.push_back('\n');
-        }
-        return result;
-    }
-    /// @brief Clear all but the LSB, i.e. make unique square.
-    constexpr void IsolateLsb()
-    {
-        v &= -v;
-    }
-    /// @brief Equality operator.
-    /// @param that Comparee.
-    /// @return true if Bitboards are equal.
-    constexpr bool operator==(Bitboard that) const
-    {
-        return v == that.v;
-    }
-    /// @brief Inequality operator.
-    /// @param that Comparee.
-    /// @return true if Bitboards are not equal.
-    constexpr bool operator!=(Bitboard that) const
-    {
-        return v != that.v;
-    }
-    /// @brief Bitwise AND assignment.
-    /// @param that Source
-    /// @return Assignee.
-    constexpr Bitboard &operator&=(Bitboard that)
-    {
-        v &= that.v;
-        return *this;
-    }
-    /// @brief Bitwise OR assignment.
-    /// @param that Source
-    /// @return Assignee.
-    constexpr Bitboard &operator|=(Bitboard that)
-    {
-        v |= that.v;
-        return *this;
-    }
-    /// @brief Bitwise XOR assignment.
-    /// @param that Source
-    /// @return Assignee.
-    constexpr Bitboard &operator^=(Bitboard that)
-    {
-        v ^= that.v;
-        return *this;
-    }
-    /// @brief Bitwise AND operator
-    /// @param that Source
-    /// @return Result.
-    constexpr Bitboard operator&(Bitboard that) const
-    {
-        return Bitboard{v & that.v};
-    }
-    /// @brief Bitwise OR operator
-    /// @param that Source
-    /// @return Result.
-    constexpr Bitboard operator|(Bitboard that) const
-    {
-        return Bitboard{v | that.v};
-    }
-    /// @brief Bitwise XOR operator
-    /// @param that Source
-    /// @return Result.
-    constexpr Bitboard operator^(Bitboard that) const
-    {
-        return Bitboard{v ^ that.v};
-    }
-    /// @brief Bitwise complement operator
-    /// @return Result.
-    constexpr Bitboard operator~() const
-    {
-        return Bitboard{~v};
-    }
-    /// @brief Least significant bit.
-    /// @return Square index of LSB.
-    constexpr Square Lsb() const
-    {
-        return Square{(uint8_t)__builtin_ctzll(v)};
-    }
-    /// @brief Most significant bit.
-    /// @return Square index of MSB.
-    constexpr Square Msb() const
-    {
-        return Square{(uint8_t)(63 - __builtin_clzll(v))};
-    }
-    /// @brief Population count.
-    /// @return Number of bits set.
-    constexpr int PopCount() const
-    {
-        return __builtin_popcountll(v);
-    }
-    /// @brief Check if bitboard is empty.
-    /// @return true if no bits are set.
-    constexpr bool IsEmpty() const
-    {
-        return v == 0;
-    }
-    /// @brief Check if bitboard is not empty.
-    /// @return true if at least 1 bit is set.
-    constexpr bool IsNotEmpty() const
-    {
-        return v != 0;
-    }
-    /// @brief Convert to native uint64_t
-    constexpr explicit operator uint64_t() const
-    {
-        return v;
-    }
-    /// @brief Shift one square to the North.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftNorth() const
-    {
-        return Bitboard{v << 8};
-    }
-    /// @brief Shift one square to the Northeast.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftNortheast() const
-    {
-        return Bitboard{(v & kNotFileH) << 9};
-    }
-    /// @brief Shift one square to the East.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftEast() const
-    {
-        return Bitboard{(v & kNotFileH) << 1};
-    }
-    /// @brief Shift one square to the Southeast.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftSoutheast() const
-    {
-        return Bitboard{(v & kNotFileH) >> 7};
-    }
-    /// @brief Shift one square to the South.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftSouth() const
-    {
-        return Bitboard{v >> 8};
-    }
-    /// @brief Shift one square to the Southwest.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftSouthwest() const
-    {
-        return Bitboard{(v & kNotFileA) >> 9};
-    }
-    /// @brief Shift one square to the West.
-    /// @return shifted Bitboard.
-    constexpr Bitboard ShiftWest() const
-    {
-        return Bitboard{(v & kNotFileA) >> 1};
-    }
-    /// @brief Shift one square to the Northwest.
-    /// @return shifted Bitboard.n
-    constexpr Bitboard ShiftNorthwest() const
-    {
-        return Bitboard{(v & kNotFileA) << 7};
-    }
+// ---------------------------------------------------------------------------
+// Bit queries
+// ---------------------------------------------------------------------------
 
-    /// @brief Dummy sentinel class for end of input iterator range.
-    class Sentinel
-    {
-    };
+/// @brief Index of the least-significant set bit. Undefined behaviour if @p b is 0.
+static inline square_t bitboard_lsb(bitboard_t b)
+{
+    return (square_t)__builtin_ctzll(b);
+}
 
-    /// @brief Input iterator to allow iteration over the squares in a Bitboard.
-    /// Dereferencing the iterator returns the index of the least significant bit set.
-    /// Incrementing the iterator clears the least significant bit set.
-    /// This allows nice clean semantics like: "for (Square s : b)" when iterating over the bits set in a bitboard.
-    class Iterator
-    {
-      private:
-        uint64_t i;
+/// @brief Index of the most-significant set bit. Undefined behaviour if @p b is 0.
+static inline square_t bitboard_msb(bitboard_t b)
+{
+    return (square_t)(63 - __builtin_clzll(b));
+}
 
-      public:
-        using value_type = Square;
-        constexpr Iterator(Bitboard bb) : i(bb.v)
-        {
-        }
-        constexpr bool operator==(const Sentinel &) const
-        {
-            return i == 0; ///< No more bits to iterate over.
-        }
-        constexpr Square operator*() const
-        {
-            return Square{(uint8_t)__builtin_ctzll(i)}; ///< Least significant bit.
-        }
-        constexpr Iterator &operator++()
-        {
-            i &= i - 1; ///< Clear LSB.
-            return *this;
-        }
-    };
+/// @brief Number of set bits (population count).
+static inline int bitboard_pop_count(bitboard_t b)
+{
+    return __builtin_popcountll(b);
+}
 
-    constexpr Iterator begin() const
-    {
-        return Iterator{*this};
-    }
+/// @brief Return @p b with all bits cleared except the least-significant one.
+static inline bitboard_t bitboard_isolate_lsb(bitboard_t b)
+{
+    return b & (0ULL - b);
+}
 
-    constexpr Sentinel end() const
-    {
-        return Sentinel{};
-    }
-};
+/// @brief Return @p b with the least-significant bit cleared.
+static inline bitboard_t bitboard_clear_lsb(bitboard_t b)
+{
+    return b & (b - 1);
+}
 
-// Useful Bitboard constant values.
+// ---------------------------------------------------------------------------
+// Directional shift helpers (edge-safe)
+// ---------------------------------------------------------------------------
+
+static const uint64_t BB_NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; ///< All squares except file A; prevents west-shift wrap.
+static const uint64_t BB_NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< All squares except file H; prevents east-shift wrap.
+
+/// @brief Shift all squares one step north (towards rank 8).
+static inline bitboard_t bitboard_shift_north(bitboard_t b)
+{
+    return b << 8;
+}
+/// @brief Shift all squares one step north-east, masking the h-file to prevent wrap.
+static inline bitboard_t bitboard_shift_northeast(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_H) << 9;
+}
+/// @brief Shift all squares one step east, masking the h-file to prevent wrap.
+static inline bitboard_t bitboard_shift_east(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_H) << 1;
+}
+/// @brief Shift all squares one step south-east, masking the h-file to prevent wrap.
+static inline bitboard_t bitboard_shift_southeast(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_H) >> 7;
+}
+/// @brief Shift all squares one step south (towards rank 1).
+static inline bitboard_t bitboard_shift_south(bitboard_t b)
+{
+    return b >> 8;
+}
+/// @brief Shift all squares one step south-west, masking the a-file to prevent wrap.
+static inline bitboard_t bitboard_shift_southwest(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_A) >> 9;
+}
+/// @brief Shift all squares one step west, masking the a-file to prevent wrap.
+static inline bitboard_t bitboard_shift_west(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_A) >> 1;
+}
+/// @brief Shift all squares one step north-west, masking the a-file to prevent wrap.
+static inline bitboard_t bitboard_shift_northwest(bitboard_t b)
+{
+    return (b & BB_NOT_FILE_A) << 7;
+}
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+/// @brief Write an 8×8 ASCII board representation of @p b into @p buf (at least 200 bytes).
+void bitboard_to_string(bitboard_t b, char *buf, size_t buf_size);
+
+// ---------------------------------------------------------------------------
+// Iteration macro
+// ---------------------------------------------------------------------------
+
+/// @brief Iterate over each set bit in @p board_expr from LSB to MSB, assigning
+/// each square index to @p sq. @p sq must be pre-declared as a @c square_t variable.
+#define BB_FOREACH(sq, board_expr)                                                                      \
+    for (uint64_t _bb_##sq = (board_expr); _bb_##sq && ((sq) = (square_t)__builtin_ctzll(_bb_##sq), 1); \
+         _bb_##sq &= _bb_##sq - 1)
+
+// ---------------------------------------------------------------------------
+// Common bitboard constants
+// ---------------------------------------------------------------------------
+
 // clang-format off
-static constexpr Bitboard kNoSquares        {0ull};
-static constexpr Bitboard kAllSquares       {~kNoSquares};
-static constexpr Bitboard kRank1            {0xFFull};
-static constexpr Bitboard kRank2            {kRank1.ShiftNorth()};
-static constexpr Bitboard kRank3            {kRank2.ShiftNorth()};
-static constexpr Bitboard kRank4            {kRank3.ShiftNorth()};
-static constexpr Bitboard kRank5            {kRank4.ShiftNorth()};
-static constexpr Bitboard kRank6            {kRank5.ShiftNorth()};
-static constexpr Bitboard kRank7            {kRank6.ShiftNorth()};
-static constexpr Bitboard kRank8            {kRank7.ShiftNorth()};
-static constexpr Bitboard kFileA            {0x0101010101010101ull};
-static constexpr Bitboard kFileB            {kFileA.ShiftEast()};
-static constexpr Bitboard kFileC            {kFileB.ShiftEast()};
-static constexpr Bitboard kFileD            {kFileC.ShiftEast()};
-static constexpr Bitboard kFileE            {kFileD.ShiftEast()};
-static constexpr Bitboard kFileF            {kFileE.ShiftEast()};
-static constexpr Bitboard kFileG            {kFileF.ShiftEast()};
-static constexpr Bitboard kFileH            {kFileG.ShiftEast()};
-static constexpr Bitboard kWhiteSquares     {0x55AA55AA55AA55AAull};
-static constexpr Bitboard kBlackSquares     {~kWhiteSquares};
+static const bitboard_t NO_SQUARES    = 0x0000000000000000ull; ///< Empty board.
+static const bitboard_t ALL_SQUARES   = 0xFFFFFFFFFFFFFFFFull; ///< All 64 squares.
+static const bitboard_t RANK1        = 0x00000000000000FFull; ///< Squares a1–h1.
+static const bitboard_t RANK2        = 0x000000000000FF00ull; ///< Squares a2–h2.
+static const bitboard_t RANK3        = 0x0000000000FF0000ull; ///< Squares a3–h3.
+static const bitboard_t RANK4        = 0x00000000FF000000ull; ///< Squares a4–h4.
+static const bitboard_t RANK5        = 0x000000FF00000000ull; ///< Squares a5–h5.
+static const bitboard_t RANK6        = 0x0000FF0000000000ull; ///< Squares a6–h6.
+static const bitboard_t RANK7        = 0x00FF000000000000ull; ///< Squares a7–h7.
+static const bitboard_t RANK8        = 0xFF00000000000000ull; ///< Squares a8–h8.
+static const bitboard_t FILE_A        = 0x0101010101010101ull; ///< Squares a1–a8.
+static const bitboard_t FILE_B        = 0x0202020202020202ull; ///< Squares b1–b8.
+static const bitboard_t FILE_C        = 0x0404040404040404ull; ///< Squares c1–c8.
+static const bitboard_t FILE_D        = 0x0808080808080808ull; ///< Squares d1–d8.
+static const bitboard_t FILE_E        = 0x1010101010101010ull; ///< Squares e1–e8.
+static const bitboard_t FILE_F        = 0x2020202020202020ull; ///< Squares f1–f8.
+static const bitboard_t FILE_G        = 0x4040404040404040ull; ///< Squares g1–g8.
+static const bitboard_t FILE_H        = 0x8080808080808080ull; ///< Squares h1–h8.
+static const bitboard_t WHITE_SQUARES = 0x55AA55AA55AA55AAull; ///< All light squares.
+static const bitboard_t BLACK_SQUARES = 0xAA55AA55AA55AA55ull; ///< All dark squares.
 // clang-format on

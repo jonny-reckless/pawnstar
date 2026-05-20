@@ -1,36 +1,42 @@
 PROGRAM             = pawnstar
-CXX                 = clang++
-CPPFLAGS            = -I include -D DEBUGX=1
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2
+CC                  = clang
+CFLAGS              = -I include -D DEBUGX=1 -D _POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -std=c17 -mbmi2
 BUILD_DIR           = build
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
-GENERATED_DATA      = src/generated_data.cpp
-GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
+GENERATED_DATA      = src/generated_data.c
+GENERATOR_SOURCE    = generate_constants/generate_constants.c
 GENERATOR_EXE       = generate_constants/gen_constants
-OBJECTS             = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
+OBJECTS             = $(addprefix $(BUILD_DIR)/, $(SOURCES:.c=.o))
 DEPS                = $(OBJECTS:.o=.d)
 SOURCES             = \
-	debug_hashtable.cpp \
-	evaluation.cpp game.cpp \
-	input_handling.cpp \
-	main.cpp \
-	opening_book.cpp \
-	perft_results.cpp \
-	position.cpp \
-	search_alphabeta.cpp \
-	search_quiescent.cpp \
-	search_root_node.cpp \
-	static_exchange_evaluation.cpp \
-	tests_bratko_kopec.cpp \
-	tests_move_generation.cpp \
-	tests_static_exchange.cpp \
-	transposition_table.cpp \
+	bitboard.c \
+	castling_rights.c \
+	chess_clock.c \
+	history_table.c \
+	pins.c \
+	debug_hashtable.c \
+	evaluation.c \
+	game.c \
+	input_handling.c \
+	main.c \
+	move.c \
+	opening_book.c \
+	perft_results.c \
+	position.c \
+	search_alphabeta.c \
+	search_quiescent.c \
+	search_root_node.c \
+	static_exchange_evaluation.c \
+	tests_bratko_kopec.c \
+	tests_move_generation.c \
+	tests_static_exchange.c \
+	transposition_table.c \
 	$(notdir $(GENERATED_DATA))
 
 ifeq ($(DEBUG), 1)
-	CXXFLAGS += -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address
+	CFLAGS += -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address
 else
-	CXXFLAGS += -g -O3 -D NDEBUG
+	CFLAGS += -g -O3 -D NDEBUG
 endif
 
 .PHONY: all prep clean gen
@@ -46,16 +52,16 @@ clean:
 gen: $(GENERATOR_EXE)
 
 # Compile an object from source, generating a .d dependency file alongside it.
-$(BUILD_DIR)/%.o: src/%.cpp
-	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
+$(BUILD_DIR)/%.o: src/%.c
+	$(CC) -c $(CFLAGS) -MMD -MP -o $@ $<
 
 # Link the executable.
 $(PROGRAM_EXE): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
 
 # Compile the generator executable.
 $(GENERATOR_EXE): $(GENERATOR_SOURCE)
-	$(CXX) $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
+	$(CC) $(CFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 
 # Invoke the generator executable to create the generated data source file.
 $(GENERATED_DATA): $(GENERATOR_EXE)

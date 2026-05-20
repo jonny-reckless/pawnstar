@@ -1,62 +1,29 @@
 #pragma once
-
+/// @file Pinned piece detection and allowed-move masks.
 #include "bitboard.h"
-#include "generated_data.h"
-#include "position.h"
+#include <stdbool.h>
 
-#include <array>
+/// Forward declaration — full definition in position.h.
+typedef struct position_t position_t;
 
-/// @brief Class for representing pinned pieces on the board and the squares to which they are allowed to move.
-class Pins
+/// @brief Tracks pinned pieces and their allowed destination squares.
+typedef struct
 {
-  public:
-    /// @brief Constructor.
-    /// @param position Position to analyze.
-    constexpr Pins(const Position &position)
-    {
-        pinned_pieces_                  = kNoSquares;
-        const Color    color            = position.ColorToMove();
-        const Bitboard occupied_squares = position.OccupiedSquares();
-        const Bitboard friendly_pieces  = position.PiecesOfColor(color);
-        const Square   king_location    = position.KingLocation(color);
-        const auto    &intervening      = kInterveningSquares[king_location];
-        const Bitboard enemy_sliding_pieces =
-            ((kBishopAttacks[king_location] & (position.Bishops() | position.Queens())) |
-             (kRookAttacks[king_location] & (position.Rooks() | position.Queens()))) &
-            ~friendly_pieces;
-        for (Square s : enemy_sliding_pieces)
-        {
-            const Bitboard intervening_squares        = intervening[s];
-            const Bitboard intervening_pieces         = intervening_squares & occupied_squares;
-            const Bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;
-            if (intervening_friendly_piece.IsNotEmpty() && intervening_pieces.PopCount() == 1)
-            {
-                // There is only a single piece between the sliding enemy attacker and the king so this piece is pinned
-                // along the attack ray. The pinned piece is also allowed to capture the pinning piece.
-                pinned_pieces_ |= intervening_friendly_piece;
-                allowed_squares_[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{s};
-            }
-        }
-    }
+    bitboard_t pinned_pieces;       ///< Squares of pinned friendly pieces.
+    bitboard_t allowed_squares[64]; ///< Allowed destination squares per source square.
+} pins_t;
 
-    /// @brief Return the allowable squares which a piece may move to considering pins.
-    /// @param s Square index
-    /// @return Set of allowed destination squares.
-    constexpr Bitboard AllowedSquares(Square s) const
-    {
-        return (Bitboard{s} & pinned_pieces_).IsNotEmpty() ? allowed_squares_[s] : kAllSquares;
-    }
+/// @brief Compute pins for the side to move in the given position.
+void pins_compute(pins_t *self, const position_t *position);
 
-    /// @brief Determine if a from-to square pair is allowed based on whether the piece is pinned.
-    /// @param from Source square.
-    /// @param to Destination square.
-    /// @return true if allowed, false if pinned.
-    constexpr bool IsAllowed(Square from, Square to) const
-    {
-        return (AllowedSquares(from) & Bitboard(to)).IsNotEmpty();
-    }
+/// @brief Allowed destination squares for a piece on square s.
+static inline bitboard_t pins_allowed_squares(const pins_t *self, square_t s)
+{
+    return ((bitboard_from_square(s) & self->pinned_pieces)) ? self->allowed_squares[s] : ALL_SQUARES;
+}
 
-  private:
-    Bitboard                 pinned_pieces_;   ///< Set of squares which are pinned.
-    std::array<Bitboard, 64> allowed_squares_; ///< Allowed squares per source.
-};
+/// @brief Is moving from->to legal given pin constraints?
+static inline bool pins_is_allowed(const pins_t *self, square_t from, square_t to)
+{
+    return ((pins_allowed_squares(self, from) & bitboard_from_square(to)));
+}

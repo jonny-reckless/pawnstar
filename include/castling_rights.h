@@ -1,134 +1,141 @@
 #pragma once
-#include <array>
-#include <cstdint>
-#include <string>
-#include <string_view>
+/// @file Castling-rights representation for a chess position.
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include "move.h"
+#include "constants.h"
 
-/// @brief Encapsulates the four castling-rights flags (white/black × kingside/queenside).
-/// The value is kept as a 4-bit field in a uint8_t so it can be used directly as an index
-/// into the Zobrist castling-rights hash table (entries 0–15).
-class CastlingRights
+/// Forward declaration — defined in generated_data.c.
+extern const zobrist_t CASTLING_RIGHTS_HASHES[16];
+
+/// @brief Castling availability for both sides.
+/// Stored as a 4-bit bitmask (CASTLING_* flags) that doubles as an index
+/// into CASTLING_RIGHTS_HASHES[0..15].
+typedef struct
 {
-  public:
-    constexpr CastlingRights() : value_{0}
-    {
-    }
-    constexpr CastlingRights(uint8_t rights) : value_{rights}
-    {
-    }
+    uint8_t value; ///< Bit field: see CastlingFlags enum.
+} castling_rights_t;
 
-    constexpr bool MayWhiteCastleKingside() const
-    {
-        return !!(value_ & kWhiteKingside);
-    }
-    constexpr bool MayWhiteCastleQueenside() const
-    {
-        return !!(value_ & kWhiteQueenside);
-    }
-    constexpr bool MayBlackCastleKingside() const
-    {
-        return !!(value_ & kBlackKingside);
-    }
-    constexpr bool MayBlackCastleQueenside() const
-    {
-        return !!(value_ & kBlackQueenside);
-    }
+/// @brief Individual castling-right bits (used as bitmask flags in castling_rights_t::value).
+enum CastlingFlags
+{
+    CASTLING_WHITE_KINGSIDE  = 0x01, ///< White may castle kingside.
+    CASTLING_WHITE_QUEENSIDE = 0x02, ///< White may castle queenside.
+    CASTLING_BLACK_KINGSIDE  = 0x04, ///< Black may castle kingside.
+    CASTLING_BLACK_QUEENSIDE = 0x08, ///< Black may castle queenside.
+};
 
-    /// @brief Zobrist hash associated with these castling rights.
-    constexpr zobrist_t Hash() const
-    {
-        return kCastlingRightsHashes[value_];
-    }
+/// @brief Return castling rights with no castling available.
+static inline castling_rights_t castling_rights_default(void)
+{
+    return (castling_rights_t){0};
+}
 
-    /// @brief Return the castling rights that result after making a move.
-    constexpr CastlingRights &AfterMove(const Move &move)
-    {
-        value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
-        return *this;
-    }
+/// @brief Construct castling rights from a raw bitmask byte.
+static inline castling_rights_t castling_rights_from_uint8(uint8_t rights)
+{
+    return (castling_rights_t){rights};
+}
 
-    /// @brief Parse the castling field from a FEN string (e.g. "KQkq" or "-").
-    static constexpr CastlingRights FromFen(std::string_view fen)
-    {
-        uint8_t result = 0;
-        if (fen == "-")
-        {
-            return CastlingRights{result};
-        }
-        for (char c : fen)
-        {
-            switch (c)
-            {
-            case 'K':
-                result |= kWhiteKingside;
-                break;
-            case 'Q':
-                result |= kWhiteQueenside;
-                break;
-            case 'k':
-                result |= kBlackKingside;
-                break;
-            case 'q':
-                result |= kBlackQueenside;
-                break;
-            default:
-                break;
-            }
-        }
-        return CastlingRights{result};
-    }
+/// @brief True if white may castle kingside.
+static inline bool castling_rights_may_white_castle_kingside(castling_rights_t cr)
+{
+    return !!(cr.value & CASTLING_WHITE_KINGSIDE);
+}
+/// @brief True if white may castle queenside.
+static inline bool castling_rights_may_white_castle_queenside(castling_rights_t cr)
+{
+    return !!(cr.value & CASTLING_WHITE_QUEENSIDE);
+}
+/// @brief True if black may castle kingside.
+static inline bool castling_rights_may_black_castle_kingside(castling_rights_t cr)
+{
+    return !!(cr.value & CASTLING_BLACK_KINGSIDE);
+}
+/// @brief True if black may castle queenside.
+static inline bool castling_rights_may_black_castle_queenside(castling_rights_t cr)
+{
+    return !!(cr.value & CASTLING_BLACK_QUEENSIDE);
+}
 
-    /// @brief Serialize castling rights to FEN format.
-    /// @return string containing FEN of castling rights (e.g. "KQkq" or "-").
-    std::string ToFenString() const
-    {
-        if (value_ == 0)
-            return "-";
-        std::string s;
-        if (value_ & kWhiteKingside)
-            s += 'K';
-        if (value_ & kWhiteQueenside)
-            s += 'Q';
-        if (value_ & kBlackKingside)
-            s += 'k';
-        if (value_ & kBlackQueenside)
-            s += 'q';
-        return s;
-    }
+/// @brief Zobrist hash contribution of the current castling rights.
+static inline zobrist_t castling_rights_hash(castling_rights_t cr)
+{
+    return CASTLING_RIGHTS_HASHES[cr.value];
+}
 
-  private:
-    uint8_t value_; ///< The actual flag value.
-
-    enum Flags : uint8_t
-    {
-        kWhiteKingside  = 0x01,
-        kWhiteQueenside = 0x02,
-        kBlackKingside  = 0x04,
-        kBlackQueenside = 0x08,
-        kOK             = (uint8_t)(~0),
-        kA1             = (uint8_t)(~kWhiteQueenside),
-        kE1             = (uint8_t)(~(kWhiteKingside | kWhiteQueenside)),
-        kH1             = (uint8_t)(~kWhiteKingside),
-        kA8             = (uint8_t)(~kBlackQueenside),
-        kE8             = (uint8_t)(~(kBlackKingside | kBlackQueenside)),
-        kH8             = (uint8_t)(~kBlackKingside),
-    };
-
-    /// @brief Mask values ANDed with move from and to squares to determine new castling rights after a move.
-    /// Only squares A1, E1, H1, A8, E8, H8 affect castling rights.
+/// @brief Return updated castling rights after a move (identified by from/to square indices).
+/// Revokes the relevant castling right whenever a king or rook moves from its starting square,
+/// or when a rook's starting square is captured.
+static inline castling_rights_t castling_rights_after_move(castling_rights_t cr, uint8_t from_sq, uint8_t to_sq)
+{
     // clang-format off
-    static constexpr std::array<uint8_t, 64> kMoveMasks
+    static const uint8_t OK = 0xFF;
+    static const uint8_t MOVE_MASKS[64] =
     {
-        kA1, kOK, kOK, kOK, kE1, kOK, kOK, kH1,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
-        kA8, kOK, kOK, kOK, kE8, kOK, kOK, kH8,
+        (uint8_t)(~CASTLING_WHITE_QUEENSIDE), OK, OK, OK, (uint8_t)(~(CASTLING_WHITE_KINGSIDE|CASTLING_WHITE_QUEENSIDE)), OK, OK, (uint8_t)(~CASTLING_WHITE_KINGSIDE),
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        OK, OK, OK, OK, OK, OK, OK, OK,
+        (uint8_t)(~CASTLING_BLACK_QUEENSIDE), OK, OK, OK, (uint8_t)(~(CASTLING_BLACK_KINGSIDE|CASTLING_BLACK_QUEENSIDE)), OK, OK, (uint8_t)(~CASTLING_BLACK_KINGSIDE),
     };
     // clang-format on
-};
+    cr.value &= MOVE_MASKS[from_sq] & MOVE_MASKS[to_sq];
+    return cr;
+}
+
+/// @brief Parse the castling field of a FEN string (e.g. @c "KQkq" or @c "-").
+static inline castling_rights_t castling_rights_from_fen(const char *fen)
+{
+    uint8_t result = 0;
+    if (fen[0] == '-' && fen[1] == '\0')
+        return (castling_rights_t){result};
+    for (const char *p = fen; *p; ++p)
+    {
+        switch (*p)
+        {
+        case 'K':
+            result |= (uint8_t)CASTLING_WHITE_KINGSIDE;
+            break;
+        case 'Q':
+            result |= (uint8_t)CASTLING_WHITE_QUEENSIDE;
+            break;
+        case 'k':
+            result |= (uint8_t)CASTLING_BLACK_KINGSIDE;
+            break;
+        case 'q':
+            result |= (uint8_t)CASTLING_BLACK_QUEENSIDE;
+            break;
+        default:
+            break;
+        }
+    }
+    return (castling_rights_t){result};
+}
+
+/// @brief Serialize castling rights to a FEN string (e.g. @c "KQkq"); @p buf must be at least 5 bytes.
+static inline void castling_rights_to_fen_string(castling_rights_t cr, char *buf, size_t buf_size)
+{
+    if (buf_size < 5)
+        return;
+    if (cr.value == 0)
+    {
+        buf[0] = '-';
+        buf[1] = '\0';
+        return;
+    }
+    int i = 0;
+    if (cr.value & CASTLING_WHITE_KINGSIDE)
+        buf[i++] = 'K';
+    if (cr.value & CASTLING_WHITE_QUEENSIDE)
+        buf[i++] = 'Q';
+    if (cr.value & CASTLING_BLACK_KINGSIDE)
+        buf[i++] = 'k';
+    if (cr.value & CASTLING_BLACK_QUEENSIDE)
+        buf[i++] = 'q';
+    buf[i] = '\0';
+}
