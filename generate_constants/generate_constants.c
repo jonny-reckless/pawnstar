@@ -219,7 +219,9 @@ static uint64_t ray_from(uint8_t sq, direction_t direction)
     uint64_t   result = 0;
     shift_fn_t fn     = SHIFT_FUNCTIONS[direction];
     for (uint64_t b = fn(sq_bb(sq)); b; b = fn(b))
+    {
         result |= b;
+    }
     return result;
 }
 
@@ -234,7 +236,9 @@ static uint64_t knight_attacks(uint8_t sq)
         int x = file_of(sq) + DX[i];
         int y = rank_of(sq) + DY[i];
         if (is_in_board(x, y))
+        {
             result |= coord_bb(x, y);
+        }
     }
     return result;
 }
@@ -415,7 +419,9 @@ static uint64_t intervening_squares(uint8_t from, uint8_t to)
     {
         uint64_t ray = ray_from(from, DIRECTIONS[i]);
         if (ray & sq_bb(to))
+        {
             return ray ^ ray_from(to, DIRECTIONS[i]) ^ sq_bb(to);
+        }
     }
     return 0;
 }
@@ -470,7 +476,10 @@ static uint64_t ray_occupancy_mask(uint8_t sq, direction_t dir)
     uint64_t   result = 0, last = 0;
     shift_fn_t fn = SHIFT_FUNCTIONS[dir];
     for (uint64_t b = fn(sq_bb(sq)); b; b = fn(b))
-        result |= b, last = b;
+    {
+        result |= b;
+        last = b;
+    }
     return result ^ last;
 }
 
@@ -497,7 +506,9 @@ static uint64_t ray_attacks(uint64_t occ, uint8_t sq, direction_t dir)
     {
         result |= b;
         if (b & occ)
+        {
             break;
+        }
     }
     return result;
 }
@@ -552,20 +563,28 @@ static gen_pext_t compute_pext(uint8_t sq, mask_fn_t mask_fn, attack_fn_t attack
     {
         uint64_t idx = _pext_u64(occupancies.data[i], p.mask);
         while (all_attacks.size <= idx)
+        {
             u64_vec_push(&all_attacks, 0);
+        }
         all_attacks.data[idx] = attack_fn(occupancies.data[i], sq);
     }
 
     // Build sorted unique attacks list.
     u64_vec_t unique = {0};
     for (size_t i = 0; i < all_attacks.size; i++)
+    {
         u64_vec_push(&unique, all_attacks.data[i]);
+    }
     qsort(unique.data, unique.size, sizeof(uint64_t), compare_u64);
     // Remove duplicates.
     size_t u = 0;
     for (size_t i = 0; i < unique.size; i++)
+    {
         if (i == 0 || unique.data[i] != unique.data[i - 1])
+        {
             unique.data[u++] = unique.data[i];
+        }
+    }
     unique.size = u;
 
     // Build indices: for each occupancy, find the index of its attack in unique[].
@@ -574,11 +593,13 @@ static gen_pext_t compute_pext(uint8_t sq, mask_fn_t mask_fn, attack_fn_t attack
         uint64_t target = all_attacks.data[i];
         uint8_t  found  = 0;
         for (size_t j = 0; j < unique.size; j++)
+        {
             if (unique.data[j] == target)
             {
                 found = (uint8_t)j;
                 break;
             }
+        }
         u8_vec_push(&p.indices, found);
     }
 
@@ -621,7 +642,9 @@ static void generate_intervening_squares(void)
         for (uint8_t j = 0; j < 64; j++)
         {
             if ((j & 7) == 0)
+            {
                 printf("\n        ");
+            }
             printf("0x%016" PRIX64 "ULL,", intervening_squares(i, j));
         }
         printf("\n    },");
@@ -642,7 +665,9 @@ static void generate_hashes(void)
             for (uint8_t i = 0; i < 64; i++)
             {
                 if ((i & 7) == 0)
+                {
                     printf("\n            ");
+                }
                 printf("0x%016" PRIX64 ",", prng_next());
             }
             printf("\n        },");
@@ -655,7 +680,9 @@ static void generate_hashes(void)
     for (uint8_t i = 0; i < 16; i++)
     {
         if ((i & 7) == 0)
+        {
             printf("\n    ");
+        }
         printf("0x%016" PRIX64 ",", prng_next());
     }
     printf("\n};\n");
@@ -664,7 +691,9 @@ static void generate_hashes(void)
     for (uint8_t i = 0; i < 64; i++)
     {
         if ((i & 7) == 0)
+        {
             printf("\n    ");
+        }
         uint8_t rank = rank_of(i);
         printf("0x%016" PRIX64 ",", (rank == 2 || rank == 5) ? prng_next() : (uint64_t)0);
     }
@@ -702,7 +731,9 @@ static void generate_pext_bitboards(void)
             for (size_t i = 0; i < pext.indices.size; i++)
             {
                 if (i % 16 == 0)
+                {
                     printf("\n    ");
+                }
                 printf("0x%02X, ", pext.indices.data[i]);
             }
             printf("\n};\n");
@@ -711,7 +742,9 @@ static void generate_pext_bitboards(void)
             for (size_t i = 0; i < pext.attacks.size; i++)
             {
                 if (i % 8 == 0)
+                {
                     printf("\n    ");
+                }
                 printf("0x%016" PRIX64 "ULL,", pext.attacks.data[i]);
             }
             printf("\n};\n");
