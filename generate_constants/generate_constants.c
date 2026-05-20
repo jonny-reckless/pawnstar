@@ -318,14 +318,16 @@ static uint64_t isolated_pawn_mask_black(uint8_t sq)
     return isolated_pawn_mask_white(sq);
 }
 
-/// @brief Return the supported-pawn mask for a white pawn on sq: squares on the same and adjacent files at or behind sq.
+/// @brief Return the supported-pawn mask for a white pawn on sq: squares on the same and adjacent files at or behind
+/// sq.
 static uint64_t supported_pawn_mask_white(uint8_t sq)
 {
     uint64_t b = ray_from(sq, DIR_SOUTH) | sq_bb(sq);
     return shift_west(b) | shift_east(b);
 }
 
-/// @brief Return the supported-pawn mask for a black pawn on sq: squares on the same and adjacent files at or behind sq.
+/// @brief Return the supported-pawn mask for a black pawn on sq: squares on the same and adjacent files at or behind
+/// sq.
 static uint64_t supported_pawn_mask_black(uint8_t sq)
 {
     uint64_t b = ray_from(sq, DIR_NORTH) | sq_bb(sq);
