@@ -6,7 +6,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
 /// @brief search a single move and return its score and whether it gives check.

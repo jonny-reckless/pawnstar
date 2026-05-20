@@ -1,6 +1,5 @@
 #include "move.h"
 #include <stdlib.h>
-#include <string.h>
 
 void move_to_string(move_t m, char *buf, size_t buf_size)
 {

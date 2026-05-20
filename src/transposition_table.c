@@ -1,7 +1,6 @@
 /// @file Functions to implement a transposition table.
 
 #include <stdlib.h>
-#include <string.h>
 
 #include "transposition_table.h"
 

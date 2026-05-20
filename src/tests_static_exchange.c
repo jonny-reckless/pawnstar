@@ -2,8 +2,6 @@
 
 #include <stdio.h>
 
-#include "debug_hashtable.h"
-#include "evaluation.h"
 #include "move.h"
 #include "position.h"
 #include "square.h"

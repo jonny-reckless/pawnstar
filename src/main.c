@@ -1,17 +1,10 @@
 /// @file Program entry point.
 
-#include <execinfo.h>
-#include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
-#include "constants.h"
 #include "debug_hashtable.h"
 #include "game.h"
 #include "opening_book.h"
-#include "position.h"
-#include "transposition_table.h"
 
 void process_input(game_t *game, const char *line);
 

@@ -1,5 +1,4 @@
 #include "bitboard.h"
-#include <stdio.h>
 
 void bitboard_to_string(bitboard_t b, char *buf, size_t buf_size)
 {

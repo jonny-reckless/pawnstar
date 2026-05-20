@@ -10,7 +10,6 @@
 #include "opening_book.h"
 #include "position.h"
 #include "tests.h"
-#include "transposition_table.h"
 
 typedef void (*handler_fn_t)(game_t *game, char **args, int argc);
 

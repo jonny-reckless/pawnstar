@@ -5,7 +5,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
 /// @brief Alpha-beta quiescence search.
