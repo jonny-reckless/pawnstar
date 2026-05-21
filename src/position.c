@@ -854,13 +854,13 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
             const bitboard_t occupied_except_king = occupied_squares ^ bitboard_from_square(king_locn);
             for (int i = 0; i < 5; i++)
             {
-                const piece_t     ep  = PIECE_ATTACKERS[i].piece;
-                const attack_fn_t efn = PIECE_ATTACKERS[i].fn;
-                const bitboard_t  eb  = (position_pieces_of_type(pos, ep) & enemy_pieces);
+                const piece_t     piece           = PIECE_ATTACKERS[i].piece;
+                const attack_fn_t attack_fn       = PIECE_ATTACKERS[i].fn;
+                const bitboard_t  enemy_attackers = position_pieces_of_type(pos, piece) & enemy_pieces;
                 square_t          s;
-                BB_FOREACH(s, eb)
+                BB_FOREACH(s, enemy_attackers)
                 {
-                    forbidden_king_squares |= efn(occupied_except_king, s);
+                    forbidden_king_squares |= attack_fn(occupied_except_king, s);
                 }
             }
             const bitboard_t king_move_targets = KING_ATTACKS[king_locn] & ~forbidden_king_squares;
@@ -888,8 +888,10 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     // Determine whether any piece is pinned and dispatch to the appropriate generator.
     pins_t pins;
     pins_compute(&pins, pos);
-    if (!pins.has_pins)
+    if (!pins.pinned_pieces)
+    {
         return position_gen_moves_no_pins(pos, color, do_all_moves, allowed_captures, allowed_non_captures);
+    }
 
     const bitboard_t occupied_squares = pos->white_pieces | pos->black_pieces;
     const bitboard_t friendly_pieces  = position_pieces_of_color(pos, color);

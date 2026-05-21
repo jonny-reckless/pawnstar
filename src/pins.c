@@ -5,7 +5,6 @@
 
 void pins_compute(pins_t *self, const position_t *pos)
 {
-    self->has_pins                 = false;
     self->pinned_pieces            = NO_SQUARES;
     const color_t    color         = position_color_to_move(pos);
     const bitboard_t occupied      = position_occupied_squares(pos);
@@ -20,11 +19,10 @@ void pins_compute(pins_t *self, const position_t *pos)
     BB_FOREACH(s, enemy_sliding)
     {
         const bitboard_t between        = intervening[s];
-        const bitboard_t between_pieces = (between & occupied);
-        const bitboard_t pinned         = (between_pieces & friendly);
-        if ((pinned) && popcount(between_pieces) == 1)
+        const bitboard_t between_pieces = between & occupied;
+        const bitboard_t pinned         = between_pieces & friendly;
+        if (pinned && popcount(between_pieces) == 1)
         {
-            self->has_pins = true;
             self->pinned_pieces |= pinned;
             self->allowed_squares[lsb(pinned)] = (between | bitboard_from_square(s));
         }
