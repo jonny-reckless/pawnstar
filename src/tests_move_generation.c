@@ -164,12 +164,12 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
         static const square_t   SQ_D8    = 59;
         if (color == WHITE)
         {
-            if (position_may_white_castle_kingside(position) && !((occupied_squares & F1_G1)) &&
+            if ((position->castling_rights & CASTLING_WHITE_KINGSIDE) && !((occupied_squares & F1_G1)) &&
                 !position_is_attacked(position, SQ_F1, BLACK) && !position_is_attacked(position, SQ_G1, BLACK))
             {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_G1));
             }
-            if (position_may_white_castle_queenside(position) && !((occupied_squares & B1_C1_D1)) &&
+            if ((position->castling_rights & CASTLING_WHITE_QUEENSIDE) && !((occupied_squares & B1_C1_D1)) &&
                 !position_is_attacked(position, SQ_D1, BLACK) && !position_is_attacked(position, SQ_C1, BLACK))
             {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_C1));
@@ -177,12 +177,12 @@ static move_list_t generate_pseudo_legal_moves(const position_t *position)
         }
         else
         {
-            if (position_may_black_castle_kingside(position) && !((occupied_squares & F8_G8)) &&
+            if ((position->castling_rights & CASTLING_BLACK_KINGSIDE) && !((occupied_squares & F8_G8)) &&
                 !position_is_attacked(position, SQ_F8, WHITE) && !position_is_attacked(position, SQ_G8, WHITE))
             {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_G8));
             }
-            if (position_may_black_castle_queenside(position) && !((occupied_squares & B8_C8_D8)) &&
+            if ((position->castling_rights & CASTLING_BLACK_QUEENSIDE) && !((occupied_squares & B8_C8_D8)) &&
                 !position_is_attacked(position, SQ_D8, WHITE) && !position_is_attacked(position, SQ_C8, WHITE))
             {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_C8));

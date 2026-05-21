@@ -34,18 +34,6 @@ void game_init(game_t *self);
 /// @brief Free all heap memory owned by the game.
 void game_free(game_t *self);
 
-/// @brief Mutable pointer to the current position.
-static inline position_t *game_current_position(game_t *self)
-{
-    return &self->position;
-}
-
-/// @brief Read-only pointer to the current position.
-static inline const position_t *game_current_position_const(const game_t *self)
-{
-    return &self->position;
-}
-
 /// @brief Reset game state and set up the position described by @p fen_string.
 void game_new_game(game_t *self, const char *fen_string);
 

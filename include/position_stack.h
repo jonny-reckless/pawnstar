@@ -27,20 +27,3 @@ static inline void move_undo_stack_pop(move_undo_stack_t *s)
     s->size--;
 }
 
-/// @brief Pointer to the record at index @p i (read-only).
-static inline const move_undo_t *move_undo_stack_get(const move_undo_stack_t *s, int i)
-{
-    return &s->items[i];
-}
-
-/// @brief Read-only pointer to the top record.
-static inline const move_undo_t *move_undo_stack_top(const move_undo_stack_t *s)
-{
-    return &s->items[s->size - 1];
-}
-
-/// @brief Number of records on the stack.
-static inline int move_undo_stack_size(const move_undo_stack_t *s)
-{
-    return s->size;
-}

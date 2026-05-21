@@ -23,27 +23,6 @@ enum CastlingFlags
     CASTLING_BLACK_QUEENSIDE = 0x08, ///< Black may castle queenside.
 };
 
-/// @brief True if white may castle kingside.
-static inline bool may_white_castle_kingside(castling_rights_t cr)
-{
-    return !!(cr & CASTLING_WHITE_KINGSIDE);
-}
-/// @brief True if white may castle queenside.
-static inline bool may_white_castle_queenside(castling_rights_t cr)
-{
-    return !!(cr & CASTLING_WHITE_QUEENSIDE);
-}
-/// @brief True if black may castle kingside.
-static inline bool may_black_castle_kingside(castling_rights_t cr)
-{
-    return !!(cr & CASTLING_BLACK_KINGSIDE);
-}
-/// @brief True if black may castle queenside.
-static inline bool may_black_castle_queenside(castling_rights_t cr)
-{
-    return !!(cr & CASTLING_BLACK_QUEENSIDE);
-}
-
 /// @brief Zobrist hash contribution of the current castling rights.
 static inline zobrist_t castling_rights_hash(castling_rights_t cr)
 {

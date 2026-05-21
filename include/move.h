@@ -167,12 +167,6 @@ static inline int move_from_to(move_t m)
     return (int)(m & 0xFFF);
 }
 
-/// @brief True if the gives-check flag is set.
-static inline bool move_is_checking(move_t m)
-{
-    return !!(m & (1 << 22));
-}
-
 // ---------------------------------------------------------------------------
 // Mutators
 // ---------------------------------------------------------------------------
@@ -223,34 +217,10 @@ typedef struct
     int    size;                          ///< Number of moves currently in the list.
 } move_list_t;
 
-/// @brief Remove all moves from the list.
-static inline void move_list_clear(move_list_t *self)
-{
-    self->size = 0;
-}
-
 /// @brief Append @p m to the end of the list. No bounds check.
 static inline void move_list_push_back(move_list_t *self, move_t m)
 {
     self->items[self->size++] = m;
-}
-
-/// @brief Remove and return the last move.
-static inline move_t move_list_pop_back(move_list_t *self)
-{
-    return self->items[--self->size];
-}
-
-/// @brief Pointer to the last move (not removed).
-static inline move_t *move_list_back(move_list_t *self)
-{
-    return &self->items[self->size - 1];
-}
-
-/// @brief Return move at index @p i by value.
-static inline move_t move_list_get(const move_list_t *self, int i)
-{
-    return self->items[i];
 }
 
 /// @brief Return a pointer to the move at index @p i.

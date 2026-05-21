@@ -77,14 +77,14 @@ void game_make_null_move(game_t *self)
 
 void game_undo_move(game_t *self, move_t move)
 {
-    const move_undo_t *undo = move_undo_stack_top(&self->undo_stack);
+    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.size - 1];
     position_undo_move(&self->position, move, undo);
     move_undo_stack_pop(&self->undo_stack);
 }
 
 void game_undo_null_move(game_t *self)
 {
-    const move_undo_t *undo = move_undo_stack_top(&self->undo_stack);
+    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.size - 1];
     position_undo_null_move(&self->position, undo);
     move_undo_stack_pop(&self->undo_stack);
 }
@@ -115,12 +115,12 @@ bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
     const zobrist_t hash        = self->position.hash;
-    const int       n           = move_undo_stack_size(&self->undo_stack);
+    const int       n           = self->undo_stack.size;
     // undo_stack[k].hash = position hash after k-1 moves (before move k was applied).
     // Step back by 2 half-moves at a time to compare same-side-to-move positions.
     for (int i = n - 2; i >= 0; i -= 2)
     {
-        const move_undo_t *u = move_undo_stack_get(&self->undo_stack, i);
+        const move_undo_t *u = &self->undo_stack.items[i];
         if (u->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
@@ -136,7 +136,7 @@ bool game_is_draw_by_repetition(const game_t *self)
 
 move_t game_play_move_from_string(game_t *self, const char *move_str)
 {
-    move_list_t move_list = position_generate_legal_moves(game_current_position(self));
+    move_list_t move_list = position_generate_legal_moves(&self->position);
     char        buf[8];
     for (int i = 0; i < move_list.size; ++i)
     {
@@ -152,7 +152,7 @@ move_t game_play_move_from_string(game_t *self, const char *move_str)
 
 bool game_is_game_over(game_t *self)
 {
-    const position_t *pos = game_current_position(self);
+    const position_t *pos = &self->position;
     if (position_is_checkmate(pos))
     {
         printf("%s\n", position_color_to_move(pos) == BLACK ? "1-0 {white mates}" : "0-1 {black mates}");

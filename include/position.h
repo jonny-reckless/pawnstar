@@ -96,30 +96,6 @@ static inline bool position_is_null_move(const position_t *pos)
     return !!(pos->state_flags & POSITION_FLAG_NULL_MOVE);
 }
 
-/// @brief True if white may castle kingside.
-static inline bool position_may_white_castle_kingside(const position_t *pos)
-{
-    return may_white_castle_kingside(pos->castling_rights);
-}
-
-/// @brief True if white may castle queenside.
-static inline bool position_may_white_castle_queenside(const position_t *pos)
-{
-    return may_white_castle_queenside(pos->castling_rights);
-}
-
-/// @brief True if black may castle kingside.
-static inline bool position_may_black_castle_kingside(const position_t *pos)
-{
-    return may_black_castle_kingside(pos->castling_rights);
-}
-
-/// @brief True if black may castle queenside.
-static inline bool position_may_black_castle_queenside(const position_t *pos)
-{
-    return may_black_castle_queenside(pos->castling_rights);
-}
-
 // ---------------------------------------------------------------------------
 // Attack queries
 // ---------------------------------------------------------------------------

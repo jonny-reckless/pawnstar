@@ -53,7 +53,7 @@ void run_position_tests(int depth)
         game.time_control.depth      = depth;
 
         char pos_buf[128];
-        position_to_string(game_current_position(&game), pos_buf, sizeof(pos_buf));
+        position_to_string(&game.position, pos_buf, sizeof(pos_buf));
         printf("\n%s\n", pos_buf);
         fflush(stdout);
 

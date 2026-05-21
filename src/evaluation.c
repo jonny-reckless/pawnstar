@@ -338,7 +338,7 @@ static int evaluate_king(const position_t *pos, color_t color)
 int evaluate_position(const game_t *game, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    const position_t *position = game_current_position_const(game);
+    const position_t *position = &game->position;
     if (position_is_draw_by_material(position) || game_is_draw_by_fifty_moves(game) || game_is_draw_by_repetition(game))
     {
         return DRAW_SCORE;

@@ -611,7 +611,7 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     const square_t   king_locn        = pos->king_location[color];
 
     move_list_t moves;
-    move_list_clear(&moves);
+    moves.size = 0;
 
     // Squares the king cannot move to (attacked or x-ray attacked by enemy).
     bitboard_t forbidden_king_squares =
@@ -700,12 +700,12 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     {
         if (color == WHITE)
         {
-            if (position_may_white_castle_kingside(pos) && !(occupied_squares & BB_F1_G1) &&
+            if ((pos->castling_rights & CASTLING_WHITE_KINGSIDE) && !(occupied_squares & BB_F1_G1) &&
                 !position_is_attacked(pos, SQ_F1, BLACK) && !position_is_attacked(pos, SQ_G1, BLACK))
             {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_G1));
             }
-            if (position_may_white_castle_queenside(pos) && !(occupied_squares & BB_B1_C1_D1) &&
+            if ((pos->castling_rights & CASTLING_WHITE_QUEENSIDE) && !(occupied_squares & BB_B1_C1_D1) &&
                 !position_is_attacked(pos, SQ_D1, BLACK) && !position_is_attacked(pos, SQ_C1, BLACK))
             {
                 move_list_push_back(&moves, move_castling(SQ_E1, SQ_C1));
@@ -713,12 +713,12 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
         }
         else
         {
-            if (position_may_black_castle_kingside(pos) && !(occupied_squares & BB_F8_G8) &&
+            if ((pos->castling_rights & CASTLING_BLACK_KINGSIDE) && !(occupied_squares & BB_F8_G8) &&
                 !position_is_attacked(pos, SQ_F8, WHITE) && !position_is_attacked(pos, SQ_G8, WHITE))
             {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_G8));
             }
-            if (position_may_black_castle_queenside(pos) && !(occupied_squares & BB_B8_C8_D8) &&
+            if ((pos->castling_rights & CASTLING_BLACK_QUEENSIDE) && !(occupied_squares & BB_B8_C8_D8) &&
                 !position_is_attacked(pos, SQ_D8, WHITE) && !position_is_attacked(pos, SQ_C8, WHITE))
             {
                 move_list_push_back(&moves, move_castling(SQ_E8, SQ_C8));

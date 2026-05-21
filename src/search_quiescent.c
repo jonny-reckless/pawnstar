@@ -16,7 +16,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent max ply");
         return evaluate_position(game, alpha, beta);
     }
-    if (position_is_in_check(game_current_position(game)))
+    if (position_is_in_check(&game->position))
     {
         INCREMENT("quiescent checks");
         variation_list_t dummy;
@@ -24,7 +24,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         return search(game, depth, ply, alpha, beta, &dummy);
     }
 
-    const zobrist_t hash = game_current_position(game)->hash;
+    const zobrist_t hash = game->position.hash;
 
     transposition_t transposition;
     bool            has_transposition = transposition_table_find(&game->quiescent_table, hash, &transposition);
@@ -77,7 +77,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         }
     }
 
-    move_list_t move_list = position_generate_legal_captures(game_current_position(game));
+    move_list_t move_list = position_generate_legal_captures(&game->position);
     game_score_and_sort_moves(game, &move_list, ply);
 
     for (int i = 0; i < move_list.size; ++i)
