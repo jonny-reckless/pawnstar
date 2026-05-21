@@ -54,7 +54,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent table move");
         game_play_move(game, transposition.move);
         score = -search_quiescent(game, depth - 1, ply + 1, -beta, -alpha);
-        game_undo_move(game);
+        game_undo_move(game, transposition.move);
         if (game->is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -90,7 +90,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
 
         game_play_move(game, move);
         score = -search_quiescent(game, depth - 1, ply + 1, -beta, -alpha);
-        game_undo_move(game);
+        game_undo_move(game, move);
         if (game->is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;

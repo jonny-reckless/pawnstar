@@ -52,9 +52,8 @@ void game_new_game(game_t *self, const char *fen_string)
     chess_clock_init(&self->time_control);
     self->node_count        = 0;
     self->is_cancel_pending = false;
-    position_stack_clear(&self->positions);
-    position_t start = position_from_string(fen_string);
-    position_stack_push_back(&self->positions, &start);
+    move_undo_stack_clear(&self->undo_stack);
+    self->position = position_from_string(fen_string);
 }
 
 void game_new_game_default(game_t *self)
@@ -64,19 +63,30 @@ void game_new_game_default(game_t *self)
 
 void game_play_move(game_t *self, move_t move)
 {
-    position_t next = position_make_move(game_current_position(self), move);
-    position_stack_push_back(&self->positions, &next);
+    move_undo_t undo;
+    position_make_move(&self->position, move, &undo);
+    move_undo_stack_push(&self->undo_stack, &undo);
 }
 
 void game_make_null_move(game_t *self)
 {
-    position_t next = position_make_null_move(game_current_position(self));
-    position_stack_push_back(&self->positions, &next);
+    move_undo_t undo;
+    position_make_null_move(&self->position, &undo);
+    move_undo_stack_push(&self->undo_stack, &undo);
 }
 
-void game_undo_move(game_t *self)
+void game_undo_move(game_t *self, move_t move)
 {
-    position_stack_pop_back(&self->positions);
+    const move_undo_t *undo = move_undo_stack_get(&self->undo_stack, self->undo_stack.size - 1);
+    position_undo_move(&self->position, move, undo);
+    move_undo_stack_pop(&self->undo_stack);
+}
+
+void game_undo_null_move(game_t *self)
+{
+    const move_undo_t *undo = move_undo_stack_get(&self->undo_stack, self->undo_stack.size - 1);
+    position_undo_null_move(&self->position, undo);
+    move_undo_stack_pop(&self->undo_stack);
 }
 
 void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
@@ -93,7 +103,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
 
 bool game_is_draw_by_fifty_moves(const game_t *self)
 {
-    if (game_current_position_const(self)->reversible_move_count >= 100)
+    if (self->position.reversible_move_count >= 100)
     {
         INCREMENT("draws by 50 moves");
         return true;
@@ -104,17 +114,19 @@ bool game_is_draw_by_fifty_moves(const game_t *self)
 bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
-    const zobrist_t hash        = game_current_position_const(self)->hash;
-    const int       size        = position_stack_size(&self->positions);
-    for (int i = size - 5; i >= 0; i -= 2)
+    const zobrist_t hash        = self->position.hash;
+    const int       n           = move_undo_stack_size(&self->undo_stack);
+    // undo_stack[k].hash = position hash after k-1 moves (before move k was applied).
+    // Step back by 2 half-moves at a time to compare same-side-to-move positions.
+    for (int i = n - 2; i >= 0; i -= 2)
     {
-        const position_t *p = position_stack_get_const(&self->positions, i);
-        if (p->hash == hash && --repetitions == 0)
+        const move_undo_t *u = move_undo_stack_get(&self->undo_stack, i);
+        if (u->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (p->reversible_move_count == 0)
+        if (u->reversible_move_count == 0)
         {
             return false;
         }

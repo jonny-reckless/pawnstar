@@ -24,7 +24,8 @@ typedef struct game
     bool                  is_cancel_pending;   ///< Set by the UCI stop command; causes the search to terminate.
     thrd_t                worker_thread;       ///< Background thread running the search.
     bool                  worker_running;      ///< True while worker_thread is alive and joinable.
-    position_stack_t      positions;           ///< Full position history (used for repetition detection).
+    position_t            position;            ///< Current board position (mutated in place during search).
+    move_undo_stack_t     undo_stack;          ///< Undo history for make/undo and repetition detection.
 } game_t;
 
 /// @brief Allocate and initialize all sub-components (transposition tables, history, etc.).
@@ -33,16 +34,16 @@ void game_init(game_t *self);
 /// @brief Free all heap memory owned by the game.
 void game_free(game_t *self);
 
-/// @brief Mutable pointer to the current position (top of the history stack).
+/// @brief Mutable pointer to the current position.
 static inline position_t *game_current_position(game_t *self)
 {
-    return position_stack_back(&self->positions);
+    return &self->position;
 }
 
 /// @brief Read-only pointer to the current position.
 static inline const position_t *game_current_position_const(const game_t *self)
 {
-    return position_stack_back_const(&self->positions);
+    return &self->position;
 }
 
 /// @brief Reset game state and set up the position described by @p fen_string.
@@ -55,14 +56,17 @@ void game_new_game_default(game_t *self);
 /// Returns the move played, or move_none() if the string is invalid.
 move_t game_play_move_from_string(game_t *self, const char *move_str);
 
-/// @brief Push @p move onto the position history stack (does not validate legality).
+/// @brief Apply @p move to the current position and push an undo record.
 void game_play_move(game_t *self, move_t move);
 
-/// @brief Push a null move (pass the turn; used in null-move pruning).
+/// @brief Apply a null move (pass the turn; used in null-move pruning) and push an undo record.
 void game_make_null_move(game_t *self);
 
-/// @brief Pop the most recent move from the position history stack.
-void game_undo_move(game_t *self);
+/// @brief Undo the last move played with game_play_move.
+void game_undo_move(game_t *self, move_t move);
+
+/// @brief Undo the last null move played with game_make_null_move.
+void game_undo_null_move(game_t *self);
 
 /// @brief Start the search worker thread (non-blocking; result delivered via UCI @c bestmove output).
 void game_start_thinking(game_t *self);

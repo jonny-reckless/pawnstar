@@ -1,58 +1,41 @@
 #pragma once
-/// @file Fixed-capacity stack of position_t values used to track position history during search.
+/// @file Fixed-capacity stack of move_undo_t records used to track undo history during search.
 #include "position.h"
 
-/// @brief Stack of up to 256 positions (sufficient for any real game + search ply).
+/// @brief Stack of up to 256 undo records (sufficient for any real game + search ply).
 typedef struct
 {
-    position_t items[256]; ///< Position storage.
-    int        size;       ///< Number of positions currently on the stack.
-} position_stack_t;
+    move_undo_t items[256]; ///< Undo record storage.
+    int         size;       ///< Number of records currently on the stack.
+} move_undo_stack_t;
 
-/// @brief Remove all positions from the stack.
-static inline void position_stack_clear(position_stack_t *s)
+/// @brief Remove all records from the stack.
+static inline void move_undo_stack_clear(move_undo_stack_t *s)
 {
     s->size = 0;
 }
 
-/// @brief Push a copy of @p p onto the stack.
-static inline void position_stack_push_back(position_stack_t *s, const position_t *p)
+/// @brief Push @p u onto the stack and return a pointer to the stored copy.
+static inline move_undo_t *move_undo_stack_push(move_undo_stack_t *s, const move_undo_t *u)
 {
-    s->items[s->size++] = *p;
+    s->items[s->size] = *u;
+    return &s->items[s->size++];
 }
 
-/// @brief Pointer to the top-of-stack position (mutable).
-static inline position_t *position_stack_back(position_stack_t *s)
-{
-    return &s->items[s->size - 1];
-}
-
-/// @brief Pointer to the top-of-stack position (read-only).
-static inline const position_t *position_stack_back_const(const position_stack_t *s)
-{
-    return &s->items[s->size - 1];
-}
-
-/// @brief Pop the top position (does not return it).
-static inline void position_stack_pop_back(position_stack_t *s)
+/// @brief Pop the top record (does not return it).
+static inline void move_undo_stack_pop(move_undo_stack_t *s)
 {
     s->size--;
 }
 
-/// @brief Number of positions on the stack.
-static inline int position_stack_size(const position_stack_t *s)
+/// @brief Pointer to the record at index @p i (read-only).
+static inline const move_undo_t *move_undo_stack_get(const move_undo_stack_t *s, int i)
+{
+    return &s->items[i];
+}
+
+/// @brief Number of records on the stack.
+static inline int move_undo_stack_size(const move_undo_stack_t *s)
 {
     return s->size;
-}
-
-/// @brief Pointer to the position at index @p i (mutable).
-static inline position_t *position_stack_get(position_stack_t *s, int i)
-{
-    return &s->items[i];
-}
-
-/// @brief Pointer to the position at index @p i (read-only).
-static inline const position_t *position_stack_get_const(const position_stack_t *s, int i)
-{
-    return &s->items[i];
 }

@@ -34,6 +34,19 @@ typedef struct position_t
 
 _Static_assert(sizeof(position_t) == 152, "position_t layout changed");
 
+/// @brief Irreversible state saved before a move so it can be undone.
+/// Only the fields that cannot be reconstructed from the move itself are saved.
+typedef struct
+{
+    zobrist_t         hash;                  ///< Zobrist hash before the move.
+    bitboard_t        checkers;              ///< Checker bitboard before the move.
+    square_t          en_passant_square;     ///< En-passant target before the move.
+    castling_rights_t castling_rights;       ///< Castling rights before the move.
+    uint8_t           reversible_move_count; ///< Half-move clock before the move.
+    uint8_t           state_flags;           ///< State flags before the move.
+    uint8_t           full_move_count;       ///< Full-move counter before the move.
+} move_undo_t;
+
 static const uint8_t POSITION_FLAG_BLACK_TO_MOVE = 0x01; ///< Set when it is Black's turn to move.
 static const uint8_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the position was reached via a null move.
 
@@ -136,11 +149,17 @@ static inline bool position_is_attacked(const position_t *pos, square_t s, color
 /// @brief Parse a FEN string and return the corresponding position.
 position_t position_from_string(const char *fen_string);
 
-/// @brief Return the position that results from playing @p move (does not modify @p pos).
-position_t position_make_move(const position_t *pos, move_t move);
+/// @brief Apply @p move to @p pos in place. Saves irreversible state in @p undo.
+void position_make_move(position_t *pos, move_t move, move_undo_t *undo);
 
-/// @brief Return the position after a null move (passes the turn; used in null-move pruning).
-position_t position_make_null_move(const position_t *pos);
+/// @brief Reverse @p move on @p pos using the previously saved @p undo record.
+void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo);
+
+/// @brief Apply a null move (pass the turn) to @p pos in place. Saves state in @p undo.
+void position_make_null_move(position_t *pos, move_undo_t *undo);
+
+/// @brief Reverse a null move using the previously saved @p undo record.
+void position_undo_null_move(position_t *pos, const move_undo_t *undo);
 
 /// @brief Serialize the position to a FEN string in @p buf.
 void position_to_string(const position_t *pos, char *buf, size_t buf_size);

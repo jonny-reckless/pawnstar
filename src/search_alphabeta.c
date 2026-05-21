@@ -52,7 +52,7 @@ single_move_result_t search_single_move(game_t *game, int depth, int ply, int al
     {
         score = -search(game, child_depth, ply + 1, -beta, -alpha, pv);
     }
-    game_undo_move(game);
+    game_undo_move(game, move);
     return (single_move_result_t){score, is_checking};
 }
 
@@ -77,7 +77,7 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
             variation_list_clear(&dummy);
             game_make_null_move(game);
             int score = -search(game, depth - 3, ply + 1, -beta, -alpha, &dummy);
-            game_undo_move(game);
+            game_undo_null_move(game);
             if (game->is_cancel_pending)
             {
                 return (null_move_result_t){SEARCH_CANCELLED_SCORE, eval_score};

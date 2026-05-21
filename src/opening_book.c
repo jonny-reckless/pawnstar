@@ -306,7 +306,8 @@ static bool parse_line_of_play(opening_book_t *self, const char *line)
         }
         entry_push_move(entry, found);
 
-        position = position_make_move(&position, found);
+        move_undo_t undo;
+        position_make_move(&position, found, &undo);
         token    = strtok(NULL, " \t\r\n");
     }
     return true;
@@ -415,7 +416,8 @@ static void pgn_process_token(pgn_state_t *s)
     }
     entry_push_move(entry, move);
 
-    s->position  = position_make_move(&s->position, move);
+    move_undo_t undo;
+    position_make_move(&s->position, move, &undo);
     s->token_len = 0;
 }
 

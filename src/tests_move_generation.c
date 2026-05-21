@@ -26,15 +26,17 @@ extern const char *perft_results[132];
 // perft search
 // ---------------------------------------------------------------------------
 
-static void perft(const position_t *src_position, int depth, uint64_t *num_moves)
+static void perft(position_t *position, int depth, uint64_t *num_moves)
 {
-    move_list_t move_list = position_generate_legal_moves(src_position);
+    move_list_t move_list = position_generate_legal_moves(position);
     if (depth > 1)
     {
         for (int i = 0; i < move_list.size; ++i)
         {
-            position_t child = position_make_move(src_position, move_list.items[i]);
-            perft(&child, depth - 1, num_moves);
+            move_undo_t undo;
+            position_make_move(position, move_list.items[i], &undo);
+            perft(position, depth - 1, num_moves);
+            position_undo_move(position, move_list.items[i], &undo);
         }
         return;
     }
@@ -211,22 +213,24 @@ static int compare_move_bits(const void *a, const void *b)
     return 0;
 }
 
-static void perft_regression(const position_t *src_position, int depth, uint64_t *num_moves)
+static void perft_regression(position_t *position, int depth, uint64_t *num_moves)
 {
-    move_list_t   legal_list  = position_generate_legal_moves(src_position);
-    move_list_t   pseudo_list = generate_pseudo_legal_moves(src_position);
-    const color_t color       = position_color_to_move(src_position);
+    move_list_t   legal_list  = position_generate_legal_moves(position);
+    move_list_t   pseudo_list = generate_pseudo_legal_moves(position);
+    const color_t color       = position_color_to_move(position);
 
     // Filter pseudo-legal moves: keep only truly legal ones.
     move_list_t validated;
     validated.size = 0;
     for (int i = 0; i < pseudo_list.size; ++i)
     {
-        position_t dst = position_make_move(src_position, pseudo_list.items[i]);
-        if (!position_is_attacked(&dst, dst.king_location[color], enemy_of(color)))
+        move_undo_t undo;
+        position_make_move(position, pseudo_list.items[i], &undo);
+        if (!position_is_attacked(position, position->king_location[color], enemy_of(color)))
         {
             move_list_push_back(&validated, pseudo_list.items[i]);
         }
+        position_undo_move(position, pseudo_list.items[i], &undo);
     }
 
     // Sort both lists for set-like comparison (sort on lower 22 bits).
@@ -236,7 +240,7 @@ static void perft_regression(const position_t *src_position, int depth, uint64_t
     qsort(sorted_validated.items, (size_t)sorted_validated.size, sizeof(move_t), compare_move_bits);
 
     char pos_buf[128], mv_buf[8];
-    position_to_string(src_position, pos_buf, sizeof(pos_buf));
+    position_to_string(position, pos_buf, sizeof(pos_buf));
 
     // Check legal ⊆ validated.
     for (int i = 0; i < sorted_legal.size; ++i)
@@ -281,8 +285,10 @@ static void perft_regression(const position_t *src_position, int depth, uint64_t
     {
         for (int i = 0; i < legal_list.size; ++i)
         {
-            position_t child = position_make_move(src_position, legal_list.items[i]);
-            perft_regression(&child, depth - 1, num_moves);
+            move_undo_t undo;
+            position_make_move(position, legal_list.items[i], &undo);
+            perft_regression(position, depth - 1, num_moves);
+            position_undo_move(position, legal_list.items[i], &undo);
         }
         return;
     }

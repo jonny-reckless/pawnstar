@@ -41,7 +41,36 @@ static inline bitboard_t *piece_bitboard_mut(position_t *pos, piece_t piece)
 
 static inline bitboard_t *color_bitboard_mut(position_t *pos, color_t color)
 {
-    return color == WHITE ? &pos->white_pieces : &pos->black_pieces;
+    return &pos->white_pieces + color;
+}
+
+// ---------------------------------------------------------------------------
+// No-hash piece helpers (used during undo — hash is restored from undo record)
+// ---------------------------------------------------------------------------
+
+static void position_add_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t to)
+{
+    const bitboard_t to_bb = bitboard_from_square(to);
+    *piece_bitboard_mut(pos, piece) ^= to_bb;
+    *color_bitboard_mut(pos, color) ^= to_bb;
+    pos->squares[to] = piece;
+}
+
+static void position_remove_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from)
+{
+    const bitboard_t from_bb = bitboard_from_square(from);
+    *piece_bitboard_mut(pos, piece) ^= from_bb;
+    *color_bitboard_mut(pos, color) ^= from_bb;
+    pos->squares[from] = NONE;
+}
+
+static void position_move_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
+{
+    const bitboard_t from_to_bb = bitboard_from_square(from) | bitboard_from_square(to);
+    *piece_bitboard_mut(pos, piece) ^= from_to_bb;
+    *color_bitboard_mut(pos, color) ^= from_to_bb;
+    pos->squares[from] = NONE;
+    pos->squares[to]   = piece;
 }
 
 static void position_add_piece(position_t *pos, color_t color, piece_t piece, square_t to)
@@ -97,90 +126,113 @@ static zobrist_t position_compute_hash(const position_t *pos)
 // Public API
 // ---------------------------------------------------------------------------
 
-position_t position_make_null_move(const position_t *pos)
+void position_make_null_move(position_t *pos, move_undo_t *undo)
 {
-    position_t dst = *pos;
-    dst.state_flags |= POSITION_FLAG_NULL_MOVE;
-    dst.state_flags ^= POSITION_FLAG_BLACK_TO_MOVE;
-    dst.hash ^= EN_PASSANT_HASHES[dst.en_passant_square];
-    dst.hash ^= BLACK_MOVE_HASH;
-    dst.en_passant_square = (square_t)(0);
-    return dst;
+    undo->hash                  = pos->hash;
+    undo->checkers              = pos->checkers;
+    undo->en_passant_square     = pos->en_passant_square;
+    undo->castling_rights       = pos->castling_rights;
+    undo->reversible_move_count = pos->reversible_move_count;
+    undo->state_flags           = pos->state_flags;
+    undo->full_move_count       = pos->full_move_count;
+
+    pos->hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
+    pos->hash ^= BLACK_MOVE_HASH;
+    pos->en_passant_square = 0;
+    pos->state_flags       = (uint8_t)((pos->state_flags | POSITION_FLAG_NULL_MOVE) ^ POSITION_FLAG_BLACK_TO_MOVE);
 }
 
-position_t position_make_move(const position_t *pos, move_t move)
+void position_undo_null_move(position_t *pos, const move_undo_t *undo)
+{
+    pos->hash                  = undo->hash;
+    pos->checkers              = undo->checkers;
+    pos->en_passant_square     = undo->en_passant_square;
+    pos->castling_rights       = undo->castling_rights;
+    pos->reversible_move_count = undo->reversible_move_count;
+    pos->state_flags           = undo->state_flags;
+    pos->full_move_count       = undo->full_move_count;
+}
+
+void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
 {
     const color_t  color = position_color_to_move(pos);
     const square_t from  = move_from(move);
     const square_t to    = move_to(move);
     const piece_t  piece = move_piece(move);
 
-    position_t dst = *pos;
-    dst.state_flags &= ~POSITION_FLAG_NULL_MOVE;
-    const castling_rights_t prev_castling_rights = dst.castling_rights;
-    dst.castling_rights                          = castling_rights_after_move(dst.castling_rights, from, to);
-    dst.hash ^= castling_rights_hash(dst.castling_rights) ^ castling_rights_hash(prev_castling_rights);
-    dst.hash ^= EN_PASSANT_HASHES[dst.en_passant_square];
-    dst.en_passant_square = 0;
+    undo->hash                  = pos->hash;
+    undo->checkers              = pos->checkers;
+    undo->en_passant_square     = pos->en_passant_square;
+    undo->castling_rights       = pos->castling_rights;
+    undo->reversible_move_count = pos->reversible_move_count;
+    undo->state_flags           = pos->state_flags;
+    undo->full_move_count       = pos->full_move_count;
+
+    pos->state_flags &= ~POSITION_FLAG_NULL_MOVE;
+    const castling_rights_t new_castling_rights = castling_rights_after_move(pos->castling_rights, from, to);
+    pos->hash ^= castling_rights_hash(new_castling_rights) ^ castling_rights_hash(pos->castling_rights);
+    pos->castling_rights = new_castling_rights;
+    pos->hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
+    pos->en_passant_square = 0;
 
     switch (move_type(move))
     {
     case MOVE_NON_CAPTURE:
-        ++dst.reversible_move_count;
-        position_move_piece(&dst, color, piece, from, to);
+        ++pos->reversible_move_count;
+        position_move_piece(pos, color, piece, from, to);
         break;
 
     case MOVE_CAPTURE:
-        dst.reversible_move_count = 0;
-        position_remove_piece(&dst, enemy_of(color), move_captured(move), to);
-        position_move_piece(&dst, color, piece, from, to);
+        pos->reversible_move_count = 0;
+        position_remove_piece(pos, enemy_of(color), move_captured(move), to);
+        position_move_piece(pos, color, piece, from, to);
         break;
 
     case MOVE_PROMOTION_KNIGHT:
     case MOVE_PROMOTION_BISHOP:
     case MOVE_PROMOTION_ROOK:
     case MOVE_PROMOTION_QUEEN:
-        dst.reversible_move_count = 0;
+        pos->reversible_move_count = 0;
         if (move_captured(move) != NONE)
         {
-            position_remove_piece(&dst, enemy_of(color), move_captured(move), to);
+            position_remove_piece(pos, enemy_of(color), move_captured(move), to);
         }
-        position_remove_piece(&dst, color, PAWN, from);
-        position_add_piece(&dst, color, move_promoted(move), to);
+        position_remove_piece(pos, color, PAWN, from);
+        position_add_piece(pos, color, move_promoted(move), to);
         break;
 
     case MOVE_PAWN_DOUBLE_PUSH:
-        dst.reversible_move_count = 0;
-        position_move_piece(&dst, color, PAWN, from, to);
-        dst.en_passant_square = (square_t)((from + to) >> 1);
-        dst.hash ^= EN_PASSANT_HASHES[dst.en_passant_square];
+        pos->reversible_move_count = 0;
+        position_move_piece(pos, color, PAWN, from, to);
+        pos->en_passant_square = (square_t)((from + to) >> 1);
+        pos->hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
         break;
 
     case MOVE_EP_CAPTURE:
-        dst.reversible_move_count = 0;
-        position_remove_piece(&dst, enemy_of(color), PAWN, (square_t)((from & 0x38) | (to & 0x07)));
-        position_move_piece(&dst, color, PAWN, from, to);
+        pos->reversible_move_count = 0;
+        position_remove_piece(pos, enemy_of(color), PAWN, (square_t)((from & 0x38) | (to & 0x07)));
+        position_move_piece(pos, color, PAWN, from, to);
         break;
 
     case MOVE_CASTLING:
-        dst.reversible_move_count = 0;
+        pos->reversible_move_count = 0;
         switch (to)
         {
         case 6: // G1
-            position_move_piece(&dst, WHITE, KING, SQ_E1, SQ_G1);
-            position_move_piece(&dst, WHITE, ROOK, SQ_H1, SQ_F1);
+            position_move_piece(pos, WHITE, KING, SQ_E1, SQ_G1);
+            position_move_piece(pos, WHITE, ROOK, SQ_H1, SQ_F1);
             break;
         case 2: // C1
-            position_move_piece(&dst, WHITE, KING, SQ_E1, SQ_C1);
-            position_move_piece(&dst, WHITE, ROOK, SQ_A1, SQ_D1);
+            position_move_piece(pos, WHITE, KING, SQ_E1, SQ_C1);
+            position_move_piece(pos, WHITE, ROOK, SQ_A1, SQ_D1);
             break;
         case 62: // G8
-            position_move_piece(&dst, BLACK, KING, SQ_E8, SQ_G8);
-            position_move_piece(&dst, BLACK, ROOK, SQ_H8, SQ_F8);
+            position_move_piece(pos, BLACK, KING, SQ_E8, SQ_G8);
+            position_move_piece(pos, BLACK, ROOK, SQ_H8, SQ_F8);
             break;
         case 58: // C8
-            position_move_piece(&dst, BLACK, KING, SQ_E8, SQ_C8);
-            position_move_piece(&dst, BLACK, ROOK, SQ_A8, SQ_D8);
+            position_move_piece(pos, BLACK, KING, SQ_E8, SQ_C8);
+            position_move_piece(pos, BLACK, ROOK, SQ_A8, SQ_D8);
             break;
         default:
             break;
@@ -188,12 +240,83 @@ position_t position_make_move(const position_t *pos, move_t move)
         break;
     }
 
-    dst.state_flags ^= POSITION_FLAG_BLACK_TO_MOVE;
-    dst.hash ^= BLACK_MOVE_HASH;
-    dst.full_move_count += (uint8_t)color; // increments after black's move
-    dst.king_location[color] = lsb((dst.kings & position_pieces_of_color(&dst, color)));
-    dst.checkers             = position_attacks_to(&dst, dst.king_location[enemy_of(color)], color);
-    return dst;
+    pos->state_flags ^= POSITION_FLAG_BLACK_TO_MOVE;
+    pos->hash ^= BLACK_MOVE_HASH;
+    pos->full_move_count += (uint8_t)color;
+    pos->king_location[color] = lsb(pos->kings & position_pieces_of_color(pos, color));
+    pos->checkers             = position_attacks_to(pos, pos->king_location[enemy_of(color)], color);
+}
+
+void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo)
+{
+    // The color that made the move is now the enemy of whoever is to move.
+    const color_t  color = enemy_of(position_color_to_move(pos));
+    const square_t from  = move_from(move);
+    const square_t to    = move_to(move);
+    const piece_t  piece = move_piece(move);
+
+    switch (move_type(move))
+    {
+    case MOVE_NON_CAPTURE:
+    case MOVE_PAWN_DOUBLE_PUSH:
+        position_move_piece_nohash(pos, color, piece, to, from);
+        break;
+
+    case MOVE_CAPTURE:
+        position_move_piece_nohash(pos, color, piece, to, from);
+        position_add_piece_nohash(pos, enemy_of(color), move_captured(move), to);
+        break;
+
+    case MOVE_PROMOTION_KNIGHT:
+    case MOVE_PROMOTION_BISHOP:
+    case MOVE_PROMOTION_ROOK:
+    case MOVE_PROMOTION_QUEEN:
+        position_remove_piece_nohash(pos, color, move_promoted(move), to);
+        position_add_piece_nohash(pos, color, PAWN, from);
+        if (move_captured(move) != NONE)
+        {
+            position_add_piece_nohash(pos, enemy_of(color), move_captured(move), to);
+        }
+        break;
+
+    case MOVE_EP_CAPTURE:
+        position_move_piece_nohash(pos, color, PAWN, to, from);
+        position_add_piece_nohash(pos, enemy_of(color), PAWN, (square_t)((from & 0x38) | (to & 0x07)));
+        break;
+
+    case MOVE_CASTLING:
+        switch (to)
+        {
+        case 6: // G1
+            position_move_piece_nohash(pos, WHITE, KING, SQ_G1, SQ_E1);
+            position_move_piece_nohash(pos, WHITE, ROOK, SQ_F1, SQ_H1);
+            break;
+        case 2: // C1
+            position_move_piece_nohash(pos, WHITE, KING, SQ_C1, SQ_E1);
+            position_move_piece_nohash(pos, WHITE, ROOK, SQ_D1, SQ_A1);
+            break;
+        case 62: // G8
+            position_move_piece_nohash(pos, BLACK, KING, SQ_G8, SQ_E8);
+            position_move_piece_nohash(pos, BLACK, ROOK, SQ_F8, SQ_H8);
+            break;
+        case 58: // C8
+            position_move_piece_nohash(pos, BLACK, KING, SQ_C8, SQ_E8);
+            position_move_piece_nohash(pos, BLACK, ROOK, SQ_D8, SQ_A8);
+            break;
+        default:
+            break;
+        }
+        break;
+    }
+
+    pos->king_location[color] = lsb(pos->kings & position_pieces_of_color(pos, color));
+    pos->hash                  = undo->hash;
+    pos->checkers              = undo->checkers;
+    pos->en_passant_square     = undo->en_passant_square;
+    pos->castling_rights       = undo->castling_rights;
+    pos->reversible_move_count = undo->reversible_move_count;
+    pos->state_flags           = undo->state_flags;
+    pos->full_move_count       = undo->full_move_count;
 }
 
 position_t position_from_string(const char *fen_string)
