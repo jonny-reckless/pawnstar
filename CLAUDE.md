@@ -52,7 +52,7 @@ Pawnstar is a UCI chess engine written in **C17** using bitboard board represent
 
 **Attack generation** — `bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks. The lookup tables live in `src/generated_data.c`. `Pins` ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation.
 
-**Search** — `game_t` ([include/game.h](include/game.h)) owns all search state: two transposition tables (64 MB main, 8 MB quiescence), a history heuristic table, opening book, chess clock, and position history stack for repetition detection. Search runs on a `thrd_t` worker thread so UCI `stop` can interrupt it.
+**Search** — `game_t` ([include/game.h](include/game.h)) owns all search state: a transposition table (64 MB), a history heuristic table, opening book, chess clock, and position history stack for repetition detection. Search runs on a `thrd_t` worker thread so UCI `stop` can interrupt it.
 
 The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)) uses iterative deepening from depth 3, PVS (principal variation search), null-move pruning, late-move reduction (LMR after the 3rd move at depth > 2 in non-PV nodes), and check/promotion/en-passant extensions. Move ordering: TT move first, then MVV-LVA combined with the history heuristic.
 

@@ -95,7 +95,7 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 `game_t` ([include/game.h](include/game.h)) owns all search state:
 
-- Two transposition tables: 64 MB for the main search, 8 MB for quiescence
+- A single transposition table (64 MB)
 - A history heuristic table indexed by `(ply, from+to)`
 - An opening book (sorted array + `bsearch` after initialization)
 - A chess clock
