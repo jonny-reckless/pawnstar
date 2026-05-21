@@ -16,7 +16,6 @@
 typedef struct game
 {
     transposition_table_t transposition_table; ///< Main transposition table (64 MB default).
-    transposition_table_t quiescent_table;     ///< Separate transposition table for quiescence search.
     history_table_t       history_table;       ///< History heuristic counts.
     chess_clock_t         time_control;        ///< Clock and time-control parameters.
     opening_book_t        book;                ///< Opening book.

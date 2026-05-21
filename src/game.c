@@ -31,7 +31,6 @@ static int search_thread_entry(void *arg)
 void game_init(game_t *self)
 {
     transposition_table_init(&self->transposition_table, (size_t)HASHTABLE_MEGABYTES);
-    transposition_table_init(&self->quiescent_table, (size_t)Q_HASHTABLE_MB);
     history_table_init(&self->history_table);
     opening_book_init(&self->book);
     self->worker_running = false;
@@ -42,7 +41,6 @@ void game_free(game_t *self)
 {
     game_stop_thinking(self);
     transposition_table_free(&self->transposition_table);
-    transposition_table_free(&self->quiescent_table);
     history_table_free(&self->history_table);
     opening_book_free(&self->book);
 }
