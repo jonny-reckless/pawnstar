@@ -29,7 +29,7 @@ static inline int abs_int(int a)
 move_t search_root_node(game_t *game)
 {
     // Check opening book first.
-    move_t book_move = opening_book_get_move(&game->book, game->position.hash);
+    move_t book_move = opening_book_get_move(&game->book, game->position.state.hash);
     if (!move_equals(book_move, move_none()))
     {
         return book_move;
@@ -58,7 +58,7 @@ move_t search_root_node(game_t *game)
         }
         else
         {
-            const int num_moves_to_go = max_int(40 - (int)(game->position.full_move_count), 5);
+            const int num_moves_to_go = max_int(40 - (int)(game->position.state.full_move_count), 5);
             ms_allocated              = game->time_control.ms_remaining / num_moves_to_go;
         }
         ms_timeout = max_int(100, min_int(ms_allocated * 2, game->time_control.ms_remaining - 1000));
@@ -88,7 +88,7 @@ move_t search_root_node(game_t *game)
     history_table_reset(&game->history_table);
     transposition_table_age(&game->transposition_table);
 
-    variation_list_t principal_variation;
+    variation_t principal_variation;
     variation_list_clear(&principal_variation);
 
     // Collect best moves across iterations for stability checks.
@@ -98,7 +98,7 @@ move_t search_root_node(game_t *game)
     // Initial shallow search to score moves for ordering.
     for (int i = 0; i < move_list.size; ++i)
     {
-        variation_list_t pv;
+        variation_t pv;
         variation_list_clear(&pv);
         int score = search_single_move(game, START_DEPTH, 0, ALPHA, BETA, move_list.items[i], &pv, i).score;
         move_assign_score(&move_list.items[i], score);
@@ -114,7 +114,7 @@ move_t search_root_node(game_t *game)
         }
 
         move_list_stable_sort(&move_list);
-        variation_list_t child_pv;
+        variation_t child_pv;
         variation_list_clear(&child_pv);
         int alpha        = ALPHA;
         game->node_count = 0;
@@ -125,7 +125,7 @@ move_t search_root_node(game_t *game)
 
         for (int i = 0; i < move_list.size; ++i)
         {
-            variation_list_t pv;
+            variation_t pv;
             variation_list_clear(&pv);
             int score = search_single_move(game, depth, 0, alpha, BETA, move_list.items[i], &pv, i).score;
             move_assign_score(&move_list.items[i], score);

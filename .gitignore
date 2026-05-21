@@ -29,7 +29,7 @@ obj/
 bin/
 x64/
 build/
-src/generated_data.c
+src/generated_data*
 include/generated_data.inc
 generate_constants/gen_constants*
 doc/html/

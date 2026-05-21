@@ -48,7 +48,7 @@ Pawnstar is a UCI chess engine written in **C17** using bitboard board represent
 
 **Board representation** — `position_t` ([include/position.h](include/position.h)) holds six per-piece bitboards, two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, and en-passant square. `bitboard_t` is a `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8). The `BB_FOREACH` macro iterates set bits LSB-first.
 
-**Move encoding** — `move_t` is a `typedef int64_t` packing from/to squares (bits 0–11), moving piece (12–14), captured piece (15–17), move type flags (18–21), gives-check flag (22), and sort score (32–63). `move_list_t` and `variation_list_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
+**Move encoding** — `move_t` is a `typedef int64_t` packing from/to squares (bits 0–11), moving piece (12–14), captured piece (15–17), move type flags (18–21), gives-check flag (22), and sort score (32–63). `move_list_t` and `variation_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
 
 **Attack generation** — `bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks. The lookup tables live in `src/generated_data.c`. `Pins` ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation.
 

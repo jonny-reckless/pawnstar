@@ -83,7 +83,7 @@ Tests are embedded in the engine — there is no separate test binary.
 | 22 | Gives-check flag |
 | 32–63 | Sort score (signed, used by move ordering) |
 
-`move_list_t` and `variation_list_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
+`move_list_t` and `variation_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
 
 ### Attack generation
 

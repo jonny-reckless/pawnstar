@@ -10,7 +10,7 @@
 
 /// @brief search a single move and return its score and whether it gives check.
 single_move_result_t search_single_move(game_t *game, int depth, int ply, int alpha, int beta, move_t move,
-                                        variation_list_t *pv, int move_index)
+                                        variation_t *pv, int move_index)
 {
     const position_t *position     = &game->position;
     const bool        was_in_check = position_is_in_check(position);
@@ -73,7 +73,7 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
         if (eval_score >= beta)
         {
             INCREMENT("null move");
-            variation_list_t dummy;
+            variation_t dummy;
             variation_list_clear(&dummy);
             game_make_null_move(game);
             int score = -search(game, depth - 3, ply + 1, -beta, -alpha, &dummy);
@@ -94,7 +94,7 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
 }
 
 /// @brief Alpha-beta main search.
-int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list_t *parent_pv)
+int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *parent_pv)
 {
     INCREMENT("alpha beta calls");
     if ((++game->node_count & 0xFFFF) == 0 && game->time_control.hard_stop_ms != 0 &&
@@ -123,7 +123,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
 
     // transposition_t table lookup.
     transposition_t transposition;
-    bool has_transposition = transposition_table_find(&game->transposition_table, position->hash, &transposition);
+    bool has_transposition = transposition_table_find(&game->transposition_table, position->state.hash, &transposition);
     if (has_transposition && transposition.depth >= depth)
     {
         switch ((transposition_node_type_t)transposition.node_type)
@@ -168,7 +168,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         return nm.score;
     }
 
-    variation_list_t pv;
+    variation_t pv;
     variation_list_clear(&pv);
     move_t best_move        = move_none();
     int    best_score       = ALPHA;
@@ -186,7 +186,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            transposition_t rec = {game->position.hash,
+            transposition_t rec = {game->position.state.hash,
                                    transposition.move,
                                    score,
                                    (int16_t)depth,
@@ -256,8 +256,8 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            transposition_t rec = {game->position.hash, move, score, (int16_t)depth,
-                                   (uint8_t)TRANSPOSITION_CUT,        false};
+            transposition_t rec = {game->position.state.hash,  move, score, (int16_t)depth,
+                                   (uint8_t)TRANSPOSITION_CUT, false};
             transposition_table_record(&game->transposition_table, &rec);
             history_table_record_good_move(&game->history_table, ply, move);
             return score;
@@ -277,7 +277,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_list
         }
     }
 
-    const zobrist_t pos_hash = game->position.hash;
+    const zobrist_t pos_hash = game->position.state.hash;
     if (has_raised_alpha)
     {
         INCREMENT("pv nodes");

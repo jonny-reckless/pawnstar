@@ -18,7 +18,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
     if (position_is_in_check(&game->position))
     {
         INCREMENT("quiescent checks");
-        variation_list_t dummy;
+        variation_t dummy;
         variation_list_clear(&dummy);
         return search(game, depth, ply, alpha, beta, &dummy);
     }

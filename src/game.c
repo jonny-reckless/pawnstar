@@ -101,7 +101,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
 
 bool game_is_draw_by_fifty_moves(const game_t *self)
 {
-    if (self->position.reversible_move_count >= 100)
+    if (self->position.state.reversible_move_count >= 100)
     {
         INCREMENT("draws by 50 moves");
         return true;
@@ -112,7 +112,7 @@ bool game_is_draw_by_fifty_moves(const game_t *self)
 bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
-    const zobrist_t hash        = self->position.hash;
+    const zobrist_t hash        = self->position.state.hash;
     const int       n           = self->undo_stack.size;
     // undo_stack[k].hash = position hash after k-1 moves (before move k was applied).
     // Step back by 2 half-moves at a time to compare same-side-to-move positions.

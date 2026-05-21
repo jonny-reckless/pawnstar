@@ -223,12 +223,6 @@ static inline void move_list_push_back(move_list_t *self, move_t m)
     self->items[self->size++] = m;
 }
 
-/// @brief Return a pointer to the move at index @p i.
-static inline move_t *move_list_get_ptr(move_list_t *self, int i)
-{
-    return &self->items[i];
-}
-
 /// @brief Sort moves descending by score (unstable).
 void move_list_sort(move_list_t *moves);
 
@@ -236,7 +230,7 @@ void move_list_sort(move_list_t *moves);
 void move_list_stable_sort(move_list_t *moves);
 
 // ---------------------------------------------------------------------------
-// variation_list_t — a line of moves up to MAX_PLY deep (principal variation)
+// variation_t — a line of moves up to MAX_PLY deep (principal variation)
 // ---------------------------------------------------------------------------
 
 /// @brief A sequence of moves up to MAX_PLY deep, used to store the principal variation.
@@ -244,22 +238,22 @@ typedef struct
 {
     move_t items[MAX_PLY]; ///< Move storage.
     int    size;           ///< Number of moves in the variation.
-} variation_list_t;
+} variation_t;
 
 /// @brief Remove all moves from the variation.
-static inline void variation_list_clear(variation_list_t *self)
+static inline void variation_list_clear(variation_t *self)
 {
     self->size = 0;
 }
 
 /// @brief Append @p m to the end of the variation.
-static inline void variation_list_push_back(variation_list_t *self, move_t m)
+static inline void variation_list_push_back(variation_t *self, move_t m)
 {
     self->items[self->size++] = m;
 }
 
 /// @brief Copy @p src into @p dst, prepending @p best_move as the first entry.
-static inline void copy_variation(variation_list_t *dst, const variation_list_t *src, move_t best_move)
+static inline void copy_variation(variation_t *dst, const variation_t *src, move_t best_move)
 {
     dst->size = 0;
     variation_list_push_back(dst, best_move);
