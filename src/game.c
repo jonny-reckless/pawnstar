@@ -77,14 +77,14 @@ void game_make_null_move(game_t *self)
 
 void game_undo_move(game_t *self, move_t move)
 {
-    const move_undo_t *undo = move_undo_stack_get(&self->undo_stack, self->undo_stack.size - 1);
+    const move_undo_t *undo = move_undo_stack_top(&self->undo_stack);
     position_undo_move(&self->position, move, undo);
     move_undo_stack_pop(&self->undo_stack);
 }
 
 void game_undo_null_move(game_t *self)
 {
-    const move_undo_t *undo = move_undo_stack_get(&self->undo_stack, self->undo_stack.size - 1);
+    const move_undo_t *undo = move_undo_stack_top(&self->undo_stack);
     position_undo_null_move(&self->position, undo);
     move_undo_stack_pop(&self->undo_stack);
 }

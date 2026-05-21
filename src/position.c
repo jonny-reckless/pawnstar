@@ -126,7 +126,7 @@ static zobrist_t position_compute_hash(const position_t *pos)
 // Public API
 // ---------------------------------------------------------------------------
 
-void position_make_null_move(position_t *pos, move_undo_t *undo)
+static void position_save_undo(move_undo_t *undo, const position_t *pos)
 {
     undo->hash                  = pos->hash;
     undo->checkers              = pos->checkers;
@@ -135,14 +135,9 @@ void position_make_null_move(position_t *pos, move_undo_t *undo)
     undo->reversible_move_count = pos->reversible_move_count;
     undo->state_flags           = pos->state_flags;
     undo->full_move_count       = pos->full_move_count;
-
-    pos->hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
-    pos->hash ^= BLACK_MOVE_HASH;
-    pos->en_passant_square = 0;
-    pos->state_flags       = (uint8_t)((pos->state_flags | POSITION_FLAG_NULL_MOVE) ^ POSITION_FLAG_BLACK_TO_MOVE);
 }
 
-void position_undo_null_move(position_t *pos, const move_undo_t *undo)
+static void position_restore_undo(position_t *pos, const move_undo_t *undo)
 {
     pos->hash                  = undo->hash;
     pos->checkers              = undo->checkers;
@@ -153,6 +148,21 @@ void position_undo_null_move(position_t *pos, const move_undo_t *undo)
     pos->full_move_count       = undo->full_move_count;
 }
 
+void position_make_null_move(position_t *pos, move_undo_t *undo)
+{
+    position_save_undo(undo, pos);
+
+    pos->hash ^= EN_PASSANT_HASHES[pos->en_passant_square];
+    pos->hash ^= BLACK_MOVE_HASH;
+    pos->en_passant_square = 0;
+    pos->state_flags       = (uint8_t)((pos->state_flags | POSITION_FLAG_NULL_MOVE) ^ POSITION_FLAG_BLACK_TO_MOVE);
+}
+
+void position_undo_null_move(position_t *pos, const move_undo_t *undo)
+{
+    position_restore_undo(pos, undo);
+}
+
 void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
 {
     const color_t  color = position_color_to_move(pos);
@@ -160,13 +170,7 @@ void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
     const square_t to    = move_to(move);
     const piece_t  piece = move_piece(move);
 
-    undo->hash                  = pos->hash;
-    undo->checkers              = pos->checkers;
-    undo->en_passant_square     = pos->en_passant_square;
-    undo->castling_rights       = pos->castling_rights;
-    undo->reversible_move_count = pos->reversible_move_count;
-    undo->state_flags           = pos->state_flags;
-    undo->full_move_count       = pos->full_move_count;
+    position_save_undo(undo, pos);
 
     pos->state_flags &= ~POSITION_FLAG_NULL_MOVE;
     const castling_rights_t new_castling_rights = castling_rights_after_move(pos->castling_rights, from, to);
@@ -249,7 +253,6 @@ void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
 
 void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo)
 {
-    // The color that made the move is now the enemy of whoever is to move.
     const color_t  color = enemy_of(position_color_to_move(pos));
     const square_t from  = move_from(move);
     const square_t to    = move_to(move);
@@ -310,13 +313,7 @@ void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo)
     }
 
     pos->king_location[color] = lsb(pos->kings & position_pieces_of_color(pos, color));
-    pos->hash                  = undo->hash;
-    pos->checkers              = undo->checkers;
-    pos->en_passant_square     = undo->en_passant_square;
-    pos->castling_rights       = undo->castling_rights;
-    pos->reversible_move_count = undo->reversible_move_count;
-    pos->state_flags           = undo->state_flags;
-    pos->full_move_count       = undo->full_move_count;
+    position_restore_undo(pos, undo);
 }
 
 position_t position_from_string(const char *fen_string)
