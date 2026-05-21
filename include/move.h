@@ -205,12 +205,6 @@ static inline bool move_less_than(move_t a, move_t b)
     return a < b;
 }
 
-/// @brief Hash of a move (for use in hash tables).
-static inline size_t move_hash(move_t m)
-{
-    return (size_t)m;
-}
-
 // ---------------------------------------------------------------------------
 // String representation (caller provides buf, at least 6 bytes)
 // ---------------------------------------------------------------------------
