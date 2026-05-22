@@ -1,4 +1,0 @@
-test_perft 1 4.17646
-test_bratko_kopec 1 1.24788
-test_see 1 0.00190349
----

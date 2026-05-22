@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/test_perft.dir/tests/test_perft.cpp.o -o test_perft  libengine.a lib/libgtest_main.a lib/libgtest.a 

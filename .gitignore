@@ -29,6 +29,7 @@ obj/
 bin/
 x64/
 build/
+build-test/
 src/generated_data*
 include/generated_data.inc
 generate_constants/gen_constants*
