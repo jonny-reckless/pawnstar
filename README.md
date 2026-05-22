@@ -48,16 +48,26 @@ Pawnstar speaks the UCI protocol. Connect it to any UCI-compatible GUI (Arena, C
 | `getboard` | Display the FEN string for the current position |
 | `bookmoves` | List available opening-book moves for the current position |
 | `freebook` | Release the opening book from memory |
-| `perft` | Run move-generation regression tests (standard PERFT positions) |
-| `perft x` | Same, with cross-validation against an independent pseudo-legal generator |
-| `seetests` | Run static exchange evaluation tests |
-| `postests [depth]` | Search Bratko-Kopec tactical positions to the given depth (default 9) |
 | `dbg` | Print internal diagnostic counters |
 | `dbgclear` | Reset diagnostic counters |
 | `help` | List all commands |
 | `quit` | Exit |
 
-Tests are embedded in the engine — there is no separate test binary.
+### Tests
+
+Tests use Google Test and are built separately:
+
+```bash
+make test
+```
+
+This configures a CMake build in `build-test/`, compiles three test executables, and runs them via `ctest`. The suites are:
+
+| Executable | Coverage |
+|---|---|
+| `test_perft` | Move-generation node counts (D1–D5, 649 cases) |
+| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move |
+| `test_see` | Static exchange evaluation |
 
 ---
 

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <assert.h>
+
 #include "constants.h"
 #include "move.h"
 
@@ -26,7 +28,7 @@ typedef struct
     bool      is_old;    ///< Entry was written during a previous search and may be evicted.
 } transposition_t;
 
-_Static_assert(sizeof(transposition_t) == 24, "transposition_t layout changed");
+static_assert(sizeof(transposition_t) == 24, "transposition_t layout changed");
 
 /// @brief The transposition table: a fixed-size heap-allocated hash table.
 /// Indexed by hash % size; collisions overwrite the existing entry.

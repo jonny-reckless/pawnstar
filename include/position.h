@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <assert.h>
+
 #include "attacks.h"
 #include "castling_rights.h"
 #include "move.h"
@@ -68,7 +70,7 @@ typedef struct position_t
     square_t    king_location[2]; ///< King square indexed by color_t (WHITE=0, BLACK=1).
 } position_t;
 
-_Static_assert(sizeof(position_t) == 160, "position_t layout changed");
+static_assert(sizeof(position_t) == 160, "position_t layout changed");
 
 // ---------------------------------------------------------------------------
 // Inline accessors (read-only)

@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "/home/jonny/work/pawnstar/src/generated_data.c"
+  "CMakeFiles/engine.dir/src/chess_clock.c.o"
+  "CMakeFiles/engine.dir/src/chess_clock.c.o.d"
+  "CMakeFiles/engine.dir/src/debug_hashtable.c.o"
+  "CMakeFiles/engine.dir/src/debug_hashtable.c.o.d"
+  "CMakeFiles/engine.dir/src/evaluation.c.o"
+  "CMakeFiles/engine.dir/src/evaluation.c.o.d"
+  "CMakeFiles/engine.dir/src/game.c.o"
+  "CMakeFiles/engine.dir/src/game.c.o.d"
+  "CMakeFiles/engine.dir/src/generated_data.c.o"
+  "CMakeFiles/engine.dir/src/generated_data.c.o.d"
+  "CMakeFiles/engine.dir/src/history_table.c.o"
+  "CMakeFiles/engine.dir/src/history_table.c.o.d"
+  "CMakeFiles/engine.dir/src/move.c.o"
+  "CMakeFiles/engine.dir/src/move.c.o.d"
+  "CMakeFiles/engine.dir/src/opening_book.c.o"
+  "CMakeFiles/engine.dir/src/opening_book.c.o.d"
+  "CMakeFiles/engine.dir/src/perft_results.c.o"
+  "CMakeFiles/engine.dir/src/perft_results.c.o.d"
+  "CMakeFiles/engine.dir/src/pins.c.o"
+  "CMakeFiles/engine.dir/src/pins.c.o.d"
+  "CMakeFiles/engine.dir/src/position.c.o"
+  "CMakeFiles/engine.dir/src/position.c.o.d"
+  "CMakeFiles/engine.dir/src/search_alphabeta.c.o"
+  "CMakeFiles/engine.dir/src/search_alphabeta.c.o.d"
+  "CMakeFiles/engine.dir/src/search_quiescent.c.o"
+  "CMakeFiles/engine.dir/src/search_quiescent.c.o.d"
+  "CMakeFiles/engine.dir/src/search_root_node.c.o"
+  "CMakeFiles/engine.dir/src/search_root_node.c.o.d"
+  "CMakeFiles/engine.dir/src/static_exchange_evaluation.c.o"
+  "CMakeFiles/engine.dir/src/static_exchange_evaluation.c.o.d"
+  "CMakeFiles/engine.dir/src/transposition_table.c.o"
+  "CMakeFiles/engine.dir/src/transposition_table.c.o.d"
+  "libengine.a"
+  "libengine.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang C)
+  include(CMakeFiles/engine.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

@@ -9,7 +9,6 @@
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
-#include "tests.h"
 
 typedef void (*handler_fn_t)(game_t *game, char **args, int argc);
 
@@ -22,24 +21,6 @@ typedef struct
 
 // Forward declaration for help handler (needs handlers array).
 static void handle_help(game_t *game, char **args, int argc);
-
-static void handle_perft(game_t *game, char **args, int argc)
-{
-    (void)game;
-    const bool do_regression = argc >= 2 && strcmp(args[1], "x") == 0;
-    run_perft_tests(do_regression);
-}
-
-static void handle_postests(game_t *game, char **args, int argc)
-{
-    (void)game;
-    int depth = 9;
-    if (argc > 1)
-    {
-        depth = atoi(args[1]);
-    }
-    run_position_tests(depth);
-}
 
 static void handle_bookmoves(game_t *game, char **args, int argc)
 {
@@ -77,14 +58,6 @@ static void handle_dbgclear(game_t *game, char **args, int argc)
     (void)args;
     (void)argc;
     debug_x_clear();
-}
-
-static void handle_seetests(game_t *game, char **args, int argc)
-{
-    (void)game;
-    (void)args;
-    (void)argc;
-    run_static_exchange_tests();
 }
 
 static void handle_getboard(game_t *game, char **args, int argc)
@@ -225,11 +198,8 @@ static const handler_t handlers[] =
     { COMMAND(go),         "search the current position" },
     { COMMAND(help),       "Display a summary of commands" },
     { COMMAND(isready),    "Respond with readyok" },
-    { COMMAND(perft),      "Run basic move generation tests" },
     { COMMAND(position),   "Set the position and series of moves" },
-    { COMMAND(postests),   "search the Bratko Kopec test positions" },
     { COMMAND(quit),       "Exit the program" },
-    { COMMAND(seetests),   "Perform very simple static exchange tests" },
     { COMMAND(stop),       "Stop searching and return best move found" },
     { COMMAND(uci),        "Enter UCI protocol" },
     { COMMAND(ucinewgame), "UCI mode start new game" },

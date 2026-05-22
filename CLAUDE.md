@@ -16,17 +16,21 @@ Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c17`, `-I incl
 
 ## Running Tests
 
-Tests are embedded as engine commands. Build first, then:
+Tests use Google Test. Build and run with:
 
 ```bash
-./build/pawnstar
-perft          # move generation regression suite (standard PERFT positions)
-perft x        # same, with cross-validation against an independent pseudo-legal generator
-seetests       # static exchange evaluation tests
-postests 9     # Bratko-Kopec search positions at depth 9 (default depth is 9)
+make test      # configure, build, and run all three test suites
 ```
 
-There is no separate test binary or unit test framework.
+Or build once and run individually:
+
+```bash
+cmake -S . -B build-test
+cmake --build build-test --parallel
+./build-test/test_perft          # 649 perft node-count cases (D1–D5)
+./build-test/test_bratko_kopec   # 24 Bratko-Kopec search positions
+./build-test/test_see            # static exchange evaluation
+```
 
 ## Code Formatting
 
