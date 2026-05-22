@@ -1,8 +1,8 @@
 /// @file Google Test suite for move-generation correctness (perft node counts).
 ///
 /// Each test case is a (FEN, depth, expected_node_count) triple parsed from the
-/// perft_results[] table in src/perft_results.c. Depths above MAX_PERFT_DEPTH
-/// are skipped to keep the total run time under ~10 seconds.
+/// perft_results[] table in tests/perft_results.c. Depths above MAX_PERFT_DEPTH
+/// are skipped.
 
 #define DEBUGX 0
 
@@ -25,8 +25,7 @@ extern "C"
     extern const char *perft_results[132];
 }
 
-// Depths above this are skipped for speed (D6 = ~120 M nodes for position 1).
-static constexpr int MAX_PERFT_DEPTH = 5;
+static constexpr int MAX_PERFT_DEPTH = 6;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
