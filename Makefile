@@ -49,7 +49,8 @@ clean:
 test:
 	cmake -S . -B $(TEST_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release --log-level=WARNING
 	cmake --build $(TEST_BUILD_DIR) --parallel
-	cd $(TEST_BUILD_DIR) && ctest --output-on-failure
+	$(TEST_BUILD_DIR)/test_perft
+	cd $(TEST_BUILD_DIR) && ctest --output-on-failure -E test_perft
 
 gen: $(GENERATOR_EXE)
 
