@@ -256,26 +256,23 @@ void process_input(game_t *game, const char *line)
     char buf[4096];
     strncpy(buf, line, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
-
-    char *argv[64];
-    int   argc  = 0;
-    char *token = strtok(buf, " \t\r\n");
-    while (token && argc < 64)
+    char *argv[512];
+    int   argc = 0;
+    char *save_ptr;
+    for (char *token = strtok_r(buf, " \t\r\n", &save_ptr); token; token = strtok_r(NULL, " \t\r\n", &save_ptr))
     {
         argv[argc++] = token;
-        token        = strtok(NULL, " \t\r\n");
     }
     if (argc == 0)
     {
         return;
     }
-
     for (int i = 0; i < NUM_HANDLERS; ++i)
     {
         if (strcmp(argv[0], handlers[i].name) == 0)
         {
             handlers[i].function(game, argv, argc);
-            return;
+            break;
         }
     }
 }

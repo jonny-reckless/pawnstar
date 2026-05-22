@@ -8,10 +8,10 @@
 #include "castling_rights.h"
 #include "move.h"
 
-typedef uint8_t flags_t;
+typedef uint8_t pos_flags_t;
 
-static const flags_t POSITION_FLAG_BLACK_TO_MOVE = 0x01; ///< Set when it is Black's turn to move.
-static const flags_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the position was reached via a null move.
+static const pos_flags_t POSITION_FLAG_BLACK_TO_MOVE = 0x01; ///< Set when it is Black's turn to move.
+static const pos_flags_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the position was reached via a null move.
 
 /// @brief Irreversible state saved before a move so it can be undone.
 /// Only the fields that cannot be reconstructed from the move itself are saved.
@@ -21,10 +21,35 @@ typedef struct
     bitboard_t        checkers;              ///< Checker bitboard before the move.
     square_t          en_passant_square;     ///< En-passant target before the move.
     castling_rights_t castling_rights;       ///< Castling rights before the move.
-    flags_t           flags;                 ///< State flags before the move.
+    pos_flags_t       flags;                 ///< State flags before the move.
     uint8_t           reversible_move_count; ///< Half-move clock before the move.
     uint8_t           full_move_count;       ///< Full-move counter before the move.
 } move_undo_t;
+
+/// @brief Stack of up to 256 undo records (sufficient for any real game + search ply).
+typedef struct
+{
+    move_undo_t items[256]; ///< Undo record storage.
+    int         count;      ///< Number of records currently on the stack.
+} move_undo_stack_t;
+
+/// @brief Remove all records from the stack.
+static inline void move_undo_stack_clear(move_undo_stack_t *s)
+{
+    s->count = 0;
+}
+
+/// @brief Push @p u onto the stack.
+static inline void move_undo_stack_push(move_undo_stack_t *s, const move_undo_t *u)
+{
+    s->items[s->count++] = *u;
+}
+
+/// @brief Pop the top record (does not return it).
+static inline void move_undo_stack_pop(move_undo_stack_t *s)
+{
+    s->count--;
+}
 
 /// @brief Complete state of a chess position.
 /// Bitboards use LERF mapping (bit 0 = a1, bit 63 = h8).

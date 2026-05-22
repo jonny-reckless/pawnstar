@@ -31,7 +31,7 @@ int main(void)
 
     game_t game;
     game_init(&game);
-    if (!opening_book_initialize(&game.book, "pawnstar.book"))
+    if (!opening_book_from_file(&game.book, "pawnstar.book"))
     {
         printf("info string Unable to open book file.\n");
     }
@@ -39,13 +39,11 @@ int main(void)
     debug_x_clear();
     printf("ready\n");
     fflush(stdout);
-
     char line[4096];
     while (fgets(line, sizeof(line), stdin))
     {
         process_input(&game, line);
     }
-
     game_free(&game);
     return 0;
 }

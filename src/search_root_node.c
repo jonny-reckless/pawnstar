@@ -89,7 +89,7 @@ move_t search_root_node(game_t *game)
     transposition_table_age(&game->transposition_table);
 
     variation_t principal_variation;
-    variation_list_clear(&principal_variation);
+    variation_clear(&principal_variation);
 
     // Collect best moves across iterations for stability checks.
     move_t best_moves[MAX_PLY];
@@ -99,7 +99,7 @@ move_t search_root_node(game_t *game)
     for (int i = 0; i < move_list.size; ++i)
     {
         variation_t pv;
-        variation_list_clear(&pv);
+        variation_clear(&pv);
         int score = search_single_move(game, START_DEPTH, 0, ALPHA, BETA, move_list.items[i], &pv, i).score;
         move_assign_score(&move_list.items[i], score);
     }
@@ -115,7 +115,7 @@ move_t search_root_node(game_t *game)
 
         move_list_stable_sort(&move_list);
         variation_t child_pv;
-        variation_list_clear(&child_pv);
+        variation_clear(&child_pv);
         int alpha        = ALPHA;
         game->node_count = 0;
         if (best_moves_n < MAX_PLY)
@@ -126,7 +126,7 @@ move_t search_root_node(game_t *game)
         for (int i = 0; i < move_list.size; ++i)
         {
             variation_t pv;
-            variation_list_clear(&pv);
+            variation_clear(&pv);
             int score = search_single_move(game, depth, 0, alpha, BETA, move_list.items[i], &pv, i).score;
             move_assign_score(&move_list.items[i], score);
             if (game->is_cancel_pending)
@@ -137,7 +137,7 @@ move_t search_root_node(game_t *game)
             {
                 alpha     = score;
                 best_move = move_list.items[i];
-                copy_variation(&principal_variation, &pv, best_move);
+                variation_copy(&principal_variation, &pv, best_move);
 
                 // Build PV string and print info.
                 char pv_buf[1024];

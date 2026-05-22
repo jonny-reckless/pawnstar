@@ -19,7 +19,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
     {
         INCREMENT("quiescent checks");
         variation_t dummy;
-        variation_list_clear(&dummy);
+        variation_clear(&dummy);
         return search(game, depth, ply, alpha, beta, &dummy);
     }
 

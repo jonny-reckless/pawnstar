@@ -9,7 +9,6 @@
 #include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
-#include "position_stack.h"
 #include "transposition_table.h"
 
 /// @brief All state required to play and search a game of chess.

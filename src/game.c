@@ -75,14 +75,14 @@ void game_make_null_move(game_t *self)
 
 void game_undo_move(game_t *self, move_t move)
 {
-    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.size - 1];
+    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.count - 1];
     position_undo_move(&self->position, move, undo);
     move_undo_stack_pop(&self->undo_stack);
 }
 
 void game_undo_null_move(game_t *self)
 {
-    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.size - 1];
+    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.count - 1];
     position_undo_null_move(&self->position, undo);
     move_undo_stack_pop(&self->undo_stack);
 }
@@ -113,7 +113,7 @@ bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
     const zobrist_t hash        = self->position.state.hash;
-    const int       n           = self->undo_stack.size;
+    const int       n           = self->undo_stack.count;
     // undo_stack[k].hash = position hash after k-1 moves (before move k was applied).
     // Step back by 2 half-moves at a time to compare same-side-to-move positions.
     for (int i = n - 2; i >= 0; i -= 2)

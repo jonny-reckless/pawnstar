@@ -25,7 +25,7 @@ static int move_compare_desc(const void *a, const void *b)
 {
     int sa = move_score(*(const move_t *)a);
     int sb = move_score(*(const move_t *)b);
-    return (sa < sb) - (sa > sb); // descending
+    return sb - sa;
 }
 
 void move_list_sort(move_list_t *moves)

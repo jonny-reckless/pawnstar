@@ -74,9 +74,9 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
         {
             INCREMENT("null move");
             variation_t dummy;
-            variation_list_clear(&dummy);
+            variation_clear(&dummy);
             game_make_null_move(game);
-            int score = -search(game, depth - 3, ply + 1, -beta, -alpha, &dummy);
+            int score = -search(game, depth - 4, ply + 1, -beta, -alpha, &dummy);
             game_undo_null_move(game);
             if (game->is_cancel_pending)
             {
@@ -169,7 +169,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
     }
 
     variation_t pv;
-    variation_list_clear(&pv);
+    variation_clear(&pv);
     move_t best_move        = move_none();
     int    best_score       = ALPHA;
     bool   has_raised_alpha = false;
@@ -284,7 +284,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         transposition_t rec = {pos_hash, best_move, alpha, (int16_t)depth, (uint8_t)TRANSPOSITION_PV, false};
         transposition_table_record(&game->transposition_table, &rec);
         history_table_record_good_move(&game->history_table, ply, best_move);
-        copy_variation(parent_pv, &pv, best_move);
+        variation_copy(parent_pv, &pv, best_move);
     }
     else
     {
