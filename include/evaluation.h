@@ -3,16 +3,6 @@
 #include "bitboard.h"
 #include <stdbool.h>
 
-/// @brief Pawn structure for one color.
-typedef struct
-{
-    bitboard_t passed_pawns;   ///< A passed pawn has no enemy pawns which can prevent it promoting.
-    bitboard_t isolated_pawns; ///< An isolated pawn has no friendly pawns on either adjacent file.
-    bitboard_t backward_pawns; ///< A backward pawn has no pawns to support it.
-    bitboard_t doubled_pawns;  ///< A doubled pawn has a friendly pawn in front of it.
-    bitboard_t defended_pawns; ///< A defended pawn has a friendly pawn defending it.
-} pawn_structure_t;
-
 typedef struct game game_t;
 
 /// @brief Evaluate the current game position. Returns a score in centipawns from the side-to-move's

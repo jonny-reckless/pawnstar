@@ -10,11 +10,6 @@
 
 #if USE_PEXT_BITBOARDS
 
-#if __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Winvalid-constexpr"
-#endif
-
 /// @brief Bishop attacks from square @p s given the occupied squares.
 static inline bitboard_t bishop_attacks(bitboard_t occupied_squares, square_t s)
 {
@@ -28,10 +23,6 @@ static inline bitboard_t rook_attacks(bitboard_t occupied_squares, square_t s)
     const pext_bitboard_t *p = &ROOK_PEXTS[s];
     return p->attacks[p->indices[_pext_u64(occupied_squares, p->occupancy_mask)]];
 }
-
-#if __GNUC__
-#pragma GCC diagnostic pop
-#endif
 
 #else
 
@@ -104,16 +95,20 @@ static inline bitboard_t king_attack_fn(bitboard_t occ, square_t s)
 /// @brief All five piece attackers (knight, bishop, rook, queen, king).
 // clang-format off
 static const piece_attacker_t PIECE_ATTACKERS[5] =
-{{KNIGHT, knight_attack_fn},
- {BISHOP, bishop_attacks  },
- {ROOK,   rook_attacks    },
- {QUEEN,  queen_attacks   },
- {KING,   king_attack_fn  }};
+{
+    {KNIGHT, knight_attack_fn},
+    {BISHOP, bishop_attacks  },
+    {ROOK,   rook_attacks    },
+    {QUEEN,  queen_attacks   },
+    {KING,   king_attack_fn  }
+};
 
 /// @brief Same as PIECE_ATTACKERS but without the king entry (used during move generation).
 static const piece_attacker_t PIECE_ATTACKERS_EXCEPT_KING[4] =
-{{KNIGHT, knight_attack_fn},
- {BISHOP, bishop_attacks  },
- {ROOK,   rook_attacks    },
- {QUEEN,  queen_attacks   }};
+{
+    {KNIGHT, knight_attack_fn},
+    {BISHOP, bishop_attacks  },
+    {ROOK,   rook_attacks    },
+    {QUEEN,  queen_attacks   }
+};
 // clang-format on

@@ -8,6 +8,11 @@
 #include "castling_rights.h"
 #include "move.h"
 
+typedef uint8_t flags_t;
+
+static const flags_t POSITION_FLAG_BLACK_TO_MOVE = 0x01; ///< Set when it is Black's turn to move.
+static const flags_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the position was reached via a null move.
+
 /// @brief Irreversible state saved before a move so it can be undone.
 /// Only the fields that cannot be reconstructed from the move itself are saved.
 typedef struct
@@ -16,8 +21,8 @@ typedef struct
     bitboard_t        checkers;              ///< Checker bitboard before the move.
     square_t          en_passant_square;     ///< En-passant target before the move.
     castling_rights_t castling_rights;       ///< Castling rights before the move.
+    flags_t           flags;                 ///< State flags before the move.
     uint8_t           reversible_move_count; ///< Half-move clock before the move.
-    uint8_t           state_flags;           ///< State flags before the move.
     uint8_t           full_move_count;       ///< Full-move counter before the move.
 } move_undo_t;
 
@@ -33,15 +38,12 @@ typedef struct position_t
     bitboard_t  kings;            ///< All kings (both colors).
     bitboard_t  white_pieces;     ///< All white pieces.
     bitboard_t  black_pieces;     ///< All black pieces.
-    move_undo_t state;            ///< Reversible state snapshot (hash, checkers, ep square, etc.).
     piece_t     squares[64];      ///< Per-square piece type (piece_t cast to uint8_t; 0 = NONE).
+    move_undo_t state;            ///< Reversible state snapshot (hash, checkers, ep square, etc.).
     square_t    king_location[2]; ///< King square indexed by color_t (WHITE=0, BLACK=1).
 } position_t;
 
 _Static_assert(sizeof(position_t) == 160, "position_t layout changed");
-
-static const uint8_t POSITION_FLAG_BLACK_TO_MOVE = 0x01; ///< Set when it is Black's turn to move.
-static const uint8_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the position was reached via a null move.
 
 // ---------------------------------------------------------------------------
 // Inline accessors (read-only)
@@ -50,19 +52,19 @@ static const uint8_t POSITION_FLAG_NULL_MOVE     = 0x02; ///< Set when the posit
 /// @brief The color whose turn it is to move.
 static inline color_t position_color_to_move(const position_t *pos)
 {
-    return (pos->state.state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK : WHITE;
+    return (pos->state.flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK : WHITE;
 }
 
 /// @brief Bitboard of all occupied squares (white | black).
 static inline bitboard_t position_occupied_squares(const position_t *pos)
 {
-    return (pos->white_pieces | pos->black_pieces);
+    return pos->white_pieces | pos->black_pieces;
 }
 
 /// @brief Bitboard of all unoccupied squares.
 static inline bitboard_t position_vacant_squares(const position_t *pos)
 {
-    return (~(pos->white_pieces | pos->black_pieces));
+    return ~(pos->white_pieces | pos->black_pieces);
 }
 
 /// @brief Bitboard of all pieces belonging to @p color.
@@ -80,13 +82,13 @@ static inline bitboard_t position_pieces_of_type(const position_t *pos, piece_t 
 /// @brief True if the side to move is in check.
 static inline bool position_is_in_check(const position_t *pos)
 {
-    return (pos->state.checkers != 0);
+    return pos->state.checkers != 0;
 }
 
 /// @brief True if the position was reached via a null move.
 static inline bool position_is_null_move(const position_t *pos)
 {
-    return !!(pos->state.state_flags & POSITION_FLAG_NULL_MOVE);
+    return !!(pos->state.flags & POSITION_FLAG_NULL_MOVE);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,9 +102,9 @@ static inline bitboard_t position_attacks_to(const position_t *pos, square_t loc
     const bitboard_t         occupied              = pos->white_pieces | pos->black_pieces;
     bitboard_t               result                = enemy_pawn_attacks[color][location] & pos->pawns;
     result |= (KNIGHT_ATTACKS[location] & pos->knights) | (KING_ATTACKS[location] & pos->kings);
-    result |= (rook_attacks(occupied, location) & (pos->rooks | pos->queens));
-    result |= (bishop_attacks(occupied, location) & (pos->bishops | pos->queens));
-    return (result & position_pieces_of_color(pos, color));
+    result |= rook_attacks(occupied, location) & (pos->rooks | pos->queens);
+    result |= bishop_attacks(occupied, location) & (pos->bishops | pos->queens);
+    return result & position_pieces_of_color(pos, color);
 }
 
 /// @brief True if square @p s is attacked by at least one piece of @p c.

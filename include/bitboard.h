@@ -17,12 +17,6 @@ static inline bitboard_t bitboard_from_square(square_t s)
     return 1ULL << s;
 }
 
-/// @brief Return a bitboard with only the square at (file, rank) set.
-static inline bitboard_t bitboard_from_coords(int file, int rank)
-{
-    return 1ULL << (file + 8 * rank);
-}
-
 // ---------------------------------------------------------------------------
 // Bit queries
 // ---------------------------------------------------------------------------
@@ -49,12 +43,6 @@ static inline int popcount(bitboard_t b)
 static inline bitboard_t isolate_lsb(bitboard_t b)
 {
     return b & (0ULL - b);
-}
-
-/// @brief Return @p b with the least-significant bit cleared.
-static inline bitboard_t clear_lsb(bitboard_t b)
-{
-    return b & (b - 1);
 }
 
 // ---------------------------------------------------------------------------

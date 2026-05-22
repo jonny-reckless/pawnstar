@@ -11,9 +11,8 @@
 /// @brief One slot in the debug counter table.
 typedef struct
 {
-    const char *key;      ///< String literal key (pointer equality used for identity after first insertion).
-    int64_t     value;    ///< Current counter value.
-    int         occupied; ///< Non-zero if this slot is in use.
+    const char *key;   ///< String literal key (pointer equality used for identity after first insertion).
+    int64_t     value; ///< Current counter value.
 } debug_entry_t;
 
 /// @brief Open-addressing hash table of named int64 debug counters.
@@ -33,45 +32,21 @@ void debug_x_write(void);
 /// @brief Increment the counter named @p key by 1.
 static inline void debug_x_increment(const char *key)
 {
-    uint64_t    h = 14695981039346656037ull;
-    const char *p = key;
-    while (*p)
-    {
-        h ^= (unsigned char)*p++;
-        h *= 1099511628211ull;
-    }
-    uint64_t idx = h & (DEBUG_TABLE_SIZE - 1);
-    while (debug_dictionary.buckets[idx].occupied && debug_dictionary.buckets[idx].key != key)
-    {
-        idx = (idx + 1) & (DEBUG_TABLE_SIZE - 1);
-    }
-    if (!debug_dictionary.buckets[idx].occupied)
-    {
-        debug_dictionary.buckets[idx].key      = key;
-        debug_dictionary.buckets[idx].value    = 0;
-        debug_dictionary.buckets[idx].occupied = 1;
-    }
-    ++debug_dictionary.buckets[idx].value;
+    uint64_t x = (uint64_t)key;
+    x >>= 2;
+    x &= (DEBUG_TABLE_SIZE - 1);
+    ++debug_dictionary.buckets[x].value;
+    debug_dictionary.buckets[x].key = key;
 }
 
 /// @brief Set the counter named @p key to @p val.
 static inline void debug_x_assign(const char *key, int64_t val)
 {
-    uint64_t    h = 14695981039346656037ull;
-    const char *p = key;
-    while (*p)
-    {
-        h ^= (unsigned char)*p++;
-        h *= 1099511628211ull;
-    }
-    uint64_t idx = h & (DEBUG_TABLE_SIZE - 1);
-    while (debug_dictionary.buckets[idx].occupied && debug_dictionary.buckets[idx].key != key)
-    {
-        idx = (idx + 1) & (DEBUG_TABLE_SIZE - 1);
-    }
-    debug_dictionary.buckets[idx].key      = key;
-    debug_dictionary.buckets[idx].value    = val;
-    debug_dictionary.buckets[idx].occupied = 1;
+    uint64_t x = (uint64_t)key;
+    x >>= 2;
+    x &= (DEBUG_TABLE_SIZE - 1);
+    debug_dictionary.buckets[x].value = val;
+    debug_dictionary.buckets[x].key   = key;
 }
 
 #define INCREMENT(x)   debug_x_increment(x)   ///< Increment the named debug counter by 1.

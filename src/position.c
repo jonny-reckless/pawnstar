@@ -34,16 +34,6 @@ static move_list_t position_gen_moves(const position_t *pos, color_t color, bool
 // Private helpers
 // ---------------------------------------------------------------------------
 
-static inline bitboard_t *piece_bitboard_mut(position_t *pos, piece_t piece)
-{
-    return &pos->pawns + (piece - PAWN);
-}
-
-static inline bitboard_t *color_bitboard_mut(position_t *pos, color_t color)
-{
-    return &pos->white_pieces + color;
-}
-
 // ---------------------------------------------------------------------------
 // No-hash piece helpers (used during undo — hash is restored from undo record)
 // ---------------------------------------------------------------------------
@@ -51,24 +41,24 @@ static inline bitboard_t *color_bitboard_mut(position_t *pos, color_t color)
 static void position_add_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t to)
 {
     const bitboard_t to_bb = bitboard_from_square(to);
-    *piece_bitboard_mut(pos, piece) ^= to_bb;
-    *color_bitboard_mut(pos, color) ^= to_bb;
+    (&pos->pawns)[piece - PAWN] ^= to_bb;
+    (&pos->white_pieces)[color] ^= to_bb;
     pos->squares[to] = piece;
 }
 
 static void position_remove_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from)
 {
     const bitboard_t from_bb = bitboard_from_square(from);
-    *piece_bitboard_mut(pos, piece) ^= from_bb;
-    *color_bitboard_mut(pos, color) ^= from_bb;
+    (&pos->pawns)[piece - PAWN] ^= from_bb;
+    (&pos->white_pieces)[color] ^= from_bb;
     pos->squares[from] = NONE;
 }
 
 static void position_move_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
 {
     const bitboard_t from_to_bb = bitboard_from_square(from) | bitboard_from_square(to);
-    *piece_bitboard_mut(pos, piece) ^= from_to_bb;
-    *color_bitboard_mut(pos, color) ^= from_to_bb;
+    (&pos->pawns)[piece - PAWN] ^= from_to_bb;
+    (&pos->white_pieces)[color] ^= from_to_bb;
     pos->squares[from] = NONE;
     pos->squares[to]   = piece;
 }
@@ -76,8 +66,8 @@ static void position_move_piece_nohash(position_t *pos, color_t color, piece_t p
 static void position_add_piece(position_t *pos, color_t color, piece_t piece, square_t to)
 {
     const bitboard_t to_bb = bitboard_from_square(to);
-    *piece_bitboard_mut(pos, piece) ^= to_bb;
-    *color_bitboard_mut(pos, color) ^= to_bb;
+    (&pos->pawns)[piece - PAWN] ^= to_bb;
+    (&pos->white_pieces)[color] ^= to_bb;
     pos->state.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
     pos->squares[to] = (uint8_t)piece;
 }
@@ -85,8 +75,8 @@ static void position_add_piece(position_t *pos, color_t color, piece_t piece, sq
 static void position_remove_piece(position_t *pos, color_t color, piece_t piece, square_t from)
 {
     const bitboard_t from_bb = bitboard_from_square(from);
-    *piece_bitboard_mut(pos, piece) ^= from_bb;
-    *color_bitboard_mut(pos, color) ^= from_bb;
+    (&pos->pawns)[piece - PAWN] ^= from_bb;
+    (&pos->white_pieces)[color] ^= from_bb;
     pos->state.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
     pos->squares[from] = (uint8_t)NONE;
 }
@@ -95,8 +85,8 @@ static void position_move_piece(position_t *pos, color_t color, piece_t piece, s
 {
     const bitboard_t from_to_bb = bitboard_from_square(from) | bitboard_from_square(to);
     const zobrist_t *hash_row   = PIECE_SQUARE_HASHES[color][piece - 1];
-    *piece_bitboard_mut(pos, piece) ^= from_to_bb;
-    *color_bitboard_mut(pos, color) ^= from_to_bb;
+    (&pos->pawns)[piece - PAWN] ^= from_to_bb;
+    (&pos->white_pieces)[color] ^= from_to_bb;
     pos->state.hash ^= hash_row[to] ^ hash_row[from];
     pos->squares[from] = (uint8_t)NONE;
     pos->squares[to]   = (uint8_t)piece;
@@ -104,17 +94,17 @@ static void position_move_piece(position_t *pos, color_t color, piece_t piece, s
 
 static zobrist_t position_compute_hash(const position_t *pos)
 {
-    zobrist_t hash = (pos->state.state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : 0ull;
+    zobrist_t hash = (pos->state.flags & POSITION_FLAG_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : 0ull;
     hash ^= castling_rights_hash(pos->state.castling_rights);
     hash ^= EN_PASSANT_HASHES[pos->state.en_passant_square];
     for (piece_t piece = PAWN; piece <= KING; ++piece)
     {
         square_t s;
-        BB_FOREACH(s, (position_pieces_of_type(pos, piece) & pos->white_pieces))
+        BB_FOREACH(s, position_pieces_of_type(pos, piece) & pos->white_pieces)
         {
             hash ^= PIECE_SQUARE_HASHES[WHITE][piece - 1][s];
         }
-        BB_FOREACH(s, (position_pieces_of_type(pos, piece) & pos->black_pieces))
+        BB_FOREACH(s, position_pieces_of_type(pos, piece) & pos->black_pieces)
         {
             hash ^= PIECE_SQUARE_HASHES[BLACK][piece - 1][s];
         }
@@ -141,10 +131,10 @@ void position_make_null_move(position_t *pos, move_undo_t *undo)
     position_save_undo(undo, pos);
 
     pos->state.hash ^= EN_PASSANT_HASHES[pos->state.en_passant_square];
-    pos->state.hash ^= BLACK_MOVE_HASH;
     pos->state.en_passant_square = 0;
-    pos->state.state_flags =
-        (uint8_t)((pos->state.state_flags | POSITION_FLAG_NULL_MOVE) ^ POSITION_FLAG_BLACK_TO_MOVE);
+    pos->state.hash ^= BLACK_MOVE_HASH;
+    pos->state.flags |= POSITION_FLAG_NULL_MOVE;
+    pos->state.flags ^= POSITION_FLAG_BLACK_TO_MOVE;
 }
 
 void position_undo_null_move(position_t *pos, const move_undo_t *undo)
@@ -161,7 +151,7 @@ void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
 
     position_save_undo(undo, pos);
 
-    pos->state.state_flags &= ~POSITION_FLAG_NULL_MOVE;
+    pos->state.flags &= ~POSITION_FLAG_NULL_MOVE;
     const castling_rights_t new_castling_rights = castling_rights_after_move(pos->state.castling_rights, from, to);
     pos->state.hash ^= castling_rights_hash(new_castling_rights) ^ castling_rights_hash(pos->state.castling_rights);
     pos->state.castling_rights = new_castling_rights;
@@ -233,7 +223,7 @@ void position_make_move(position_t *pos, move_t move, move_undo_t *undo)
         break;
     }
 
-    pos->state.state_flags ^= POSITION_FLAG_BLACK_TO_MOVE;
+    pos->state.flags ^= POSITION_FLAG_BLACK_TO_MOVE;
     pos->state.hash ^= BLACK_MOVE_HASH;
     pos->state.full_move_count += (uint8_t)color;
     pos->king_location[color] = lsb(pos->kings & position_pieces_of_color(pos, color));
@@ -352,7 +342,7 @@ position_t position_from_string(const char *fen_string)
     // Side to move
     if (*p == 'b')
     {
-        pos.state.state_flags |= POSITION_FLAG_BLACK_TO_MOVE;
+        pos.state.flags |= POSITION_FLAG_BLACK_TO_MOVE;
     }
     while (*p && *p != ' ')
     {
@@ -385,7 +375,7 @@ position_t position_from_string(const char *fen_string)
     // En passant
     if (*p == '-')
     {
-        pos.state.en_passant_square = (square_t)(0);
+        pos.state.en_passant_square = (square_t)0;
         p++;
     }
     else
@@ -428,8 +418,8 @@ position_t position_from_string(const char *fen_string)
         pos.state.full_move_count = (uint8_t)(fmn > 0 ? fmn - 1 : 0);
     }
 
-    pos.king_location[WHITE] = lsb((pos.kings & pos.white_pieces));
-    pos.king_location[BLACK] = lsb((pos.kings & pos.black_pieces));
+    pos.king_location[WHITE] = lsb(pos.kings & pos.white_pieces);
+    pos.king_location[BLACK] = lsb(pos.kings & pos.black_pieces);
     pos.state.hash           = position_compute_hash(&pos);
     const color_t color      = position_color_to_move(&pos);
     pos.state.checkers       = position_attacks_to(&pos, pos.king_location[color], enemy_of(color));
@@ -445,7 +435,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
     char *p   = buf;
     char *end = buf + buf_size - 1;
 
-    const bitboard_t occ = (pos->white_pieces | pos->black_pieces);
+    const bitboard_t occ = pos->white_pieces | pos->black_pieces;
     for (int rank = 7; rank >= 0; --rank)
     {
         int num_empty = 0;
@@ -465,7 +455,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
                     num_empty = 0;
                 }
                 piece_t     piece    = pos->squares[sq];
-                bool        is_white = ((pos->white_pieces & sq_bb));
+                bool        is_white = pos->white_pieces & sq_bb;
                 const char *chars    = is_white ? " PNBRQK" : " pnbrqk";
                 if (p < end)
                 {
@@ -489,7 +479,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
     }
     if (p < end)
     {
-        *p++ = (pos->state.state_flags & POSITION_FLAG_BLACK_TO_MOVE) ? 'b' : 'w';
+        *p++ = (pos->state.flags & POSITION_FLAG_BLACK_TO_MOVE) ? 'b' : 'w';
     }
     if (p < end)
     {
@@ -536,8 +526,8 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
 
 bool position_is_draw_by_material(const position_t *pos)
 {
-    const bitboard_t occ = (pos->white_pieces | pos->black_pieces);
-    switch (popcount(occ))
+    const bitboard_t occupied = pos->white_pieces | pos->black_pieces;
+    switch (popcount(occupied))
     {
     case 0:
     case 1:
@@ -547,18 +537,18 @@ bool position_is_draw_by_material(const position_t *pos)
         INCREMENT("draws by material (2)");
         return true;
     case 3:
-        if (((pos->bishops | pos->knights)))
+        if (pos->bishops | pos->knights)
         {
             INCREMENT("draws by material (3)");
             return true;
         }
         return false;
     case 4: {
-        const bitboard_t white_bishops = (pos->bishops & pos->white_pieces);
-        const bitboard_t black_bishops = (pos->bishops & pos->black_pieces);
-        const bool       wb_on_white   = ((white_bishops & WHITE_SQUARES));
-        const bool       bb_on_white   = ((black_bishops & WHITE_SQUARES));
-        if ((white_bishops) && (black_bishops) && wb_on_white == bb_on_white)
+        const bitboard_t white_bishops = pos->bishops & pos->white_pieces;
+        const bitboard_t black_bishops = pos->bishops & pos->black_pieces;
+        const bool       wb_on_white   = white_bishops & WHITE_SQUARES;
+        const bool       bb_on_white   = black_bishops & WHITE_SQUARES;
+        if (white_bishops && black_bishops && wb_on_white == bb_on_white)
         {
             INCREMENT("draws by material (4)");
             return true;
@@ -617,7 +607,7 @@ static move_list_t position_gen_moves_no_pins(const position_t *pos, color_t col
     {
         const piece_t     ep  = PIECE_ATTACKERS[i].piece;
         const attack_fn_t efn = PIECE_ATTACKERS[i].fn;
-        const bitboard_t  eb  = (position_pieces_of_type(pos, ep) & enemy_pieces);
+        const bitboard_t  eb  = position_pieces_of_type(pos, ep) & enemy_pieces;
         square_t          s;
         BB_FOREACH(s, eb)
         {
@@ -809,7 +799,7 @@ static move_list_t position_gen_moves_no_pins(const position_t *pos, color_t col
     {
         const square_t ep_to         = pos->state.en_passant_square;
         const square_t captured_pawn = (square_t)((from & 0x38) | (ep_to & 0x07));
-        if ((allowed_captures & bitboard_from_square(captured_pawn)))
+        if (allowed_captures & bitboard_from_square(captured_pawn))
         {
             if (square_rank(king_locn) == square_rank(from))
             {
@@ -867,13 +857,13 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
             move_list_t      moves;
             moves.size = 0;
             square_t to;
-            BB_FOREACH(to, (king_move_targets & enemy_pieces))
+            BB_FOREACH(to, king_move_targets & enemy_pieces)
             {
                 move_list_push_back(&moves, move_capture(king_locn, to, KING, pos->squares[to]));
             }
             if (do_all_moves)
             {
-                BB_FOREACH(to, (king_move_targets & ~occupied_squares))
+                BB_FOREACH(to, king_move_targets & ~occupied_squares)
                 {
                     move_list_push_back(&moves, move_non_capture(king_locn, to, KING));
                 }
@@ -913,7 +903,7 @@ move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all
     {
         const piece_t     ep  = PIECE_ATTACKERS[i].piece;
         const attack_fn_t efn = PIECE_ATTACKERS[i].fn;
-        const bitboard_t  eb  = (position_pieces_of_type(pos, ep) & enemy_pieces);
+        const bitboard_t  eb  = position_pieces_of_type(pos, ep) & enemy_pieces;
         square_t          s;
         BB_FOREACH(s, eb)
         {

@@ -33,5 +33,5 @@ static inline bool pins_is_allowed(const pins_t *self, square_t from, square_t t
     {
         return true;
     }
-    return ((pins_allowed_squares(self, from) & bitboard_from_square(to)));
+    return pins_allowed_squares(self, from) & bitboard_from_square(to);
 }

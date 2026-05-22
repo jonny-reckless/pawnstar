@@ -1,5 +1,6 @@
 /// @file Debugging counts dictionary.
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,11 +20,11 @@ static int compare_debug_entries(const void *a, const void *b)
 {
     const debug_entry_t *ea = (const debug_entry_t *)a;
     const debug_entry_t *eb = (const debug_entry_t *)b;
-    if (!ea->occupied)
+    if (!ea->key)
     {
-        return eb->occupied ? 1 : 0;
+        return eb->key ? 1 : 0;
     }
-    if (!eb->occupied)
+    if (!eb->key)
     {
         return -1;
     }
@@ -37,9 +38,9 @@ void debug_x_write(void)
     qsort(sorted, DEBUG_TABLE_SIZE, sizeof(debug_entry_t), compare_debug_entries);
 
     printf("********************* DEBUGX *********************\n");
-    for (int i = 0; i < DEBUG_TABLE_SIZE && sorted[i].occupied; ++i)
+    for (int i = 0; i < DEBUG_TABLE_SIZE && sorted[i].key; ++i)
     {
-        printf("%-40s%10lld\n", sorted[i].key, (long long)sorted[i].value);
+        printf("%-40s%10" PRId64 "\n", sorted[i].key, sorted[i].value);
     }
     printf("**************************************************\n");
     fflush(stdout);
