@@ -55,19 +55,29 @@ Pawnstar speaks the UCI protocol. Connect it to any UCI-compatible GUI (Arena, C
 
 ### Tests
 
-Tests use Google Test and are built separately:
+Tests use Google Test and are built separately via CMake:
 
 ```bash
 make test
 ```
 
-This configures a CMake build in `build-test/`, compiles three test executables, and runs them via `ctest`. The suites are:
+This configures a CMake build in `build-test/`, compiles three test executables, runs `test_perft` directly (streaming per-case output to stdout), then runs the remaining suites via `ctest`.
 
-| Executable | Coverage |
-|---|---|
-| `test_perft` | Move-generation node counts (D1–D5, 649 cases) |
-| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move |
-| `test_see` | Static exchange evaluation |
+| Executable | Coverage | Cases |
+|---|---|---|
+| `test_perft` | Move-generation node counts (D1–D6) | 778 |
+| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move | 24 |
+| `test_see` | Static exchange evaluation | 2 |
+
+The test executables can also be run individually after building:
+
+```bash
+cmake -S . -B build-test
+cmake --build build-test --parallel
+./build-test/test_perft
+./build-test/test_bratko_kopec
+./build-test/test_see
+```
 
 ---
 
@@ -75,7 +85,7 @@ This configures a CMake build in `build-test/`, compiles three test executables,
 
 ### Board representation
 
-`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, en-passant square, and half/full-move counters.
+`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, and a `state` field (`move_undo_t`) containing the Zobrist hash, checker bitboard, castling rights, en-passant square, and half/full-move counters.
 
 `bitboard_t` is a `typedef uint64_t` in LERF mapping: bit 0 = a1, bit 63 = h8. Direct bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`) are used throughout; the `BB_FOREACH` macro iterates set bits from LSB to MSB.
 
@@ -97,7 +107,7 @@ This configures a CMake build in `build-test/`, compiles three test executables,
 
 ### Attack generation
 
-`bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`. A classical ray-subtraction fallback is available for non-BMI2 builds (`USE_PEXT_BITBOARDS=0`).
+`bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`.
 
 Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation, allowing the legal-move generator to filter pinned pieces efficiently.
 
@@ -105,11 +115,11 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 `game_t` ([include/game.h](include/game.h)) owns all search state:
 
-- A single transposition table (64 MB)
+- A transposition table (64 MB)
 - A history heuristic table indexed by `(ply, from+to)`
 - An opening book (sorted array + `bsearch` after initialization)
 - A chess clock
-- A position history stack for repetition detection
+- A `move_undo_stack_t` for make/undo and repetition detection
 
 Search runs on a background `thrd_t` worker thread so the UCI `stop` command can interrupt it immediately.
 
@@ -133,6 +143,8 @@ Move ordering: transposition-table move first, then MVV-LVA (victim value × 100
 - Pawn structure: passed, isolated, backward, doubled, and defended pawns
 - Mobility
 - King safety (pawn shelter, attacking pieces near the king)
+
+Lazy evaluation returns early when the score is clearly outside the alpha-beta window.
 
 Static exchange evaluation ([include/static_exchange_evaluation.h](include/static_exchange_evaluation.h)) estimates the material outcome of a capture sequence for move ordering.
 
