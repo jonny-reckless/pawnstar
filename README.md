@@ -22,7 +22,7 @@ make DEBUG=1   # debug build with ASan + UBSan
 make clean     # remove all build artefacts
 ```
 
-The build has one code-generation step: `generate_constants/generate_constants.c` is compiled and run to produce `src/generated_data.c` (precomputed bitboard lookup tables and Zobrist hashes). The output is committed, so regeneration is only needed when the attack-mask logic changes.
+The build has one code-generation step: `generate_constants/generate_constants.c` is compiled and run to produce `src/generated_data.c` (precomputed bitboard lookup tables and Zobrist hashes).
 
 ---
 
@@ -55,29 +55,19 @@ Pawnstar speaks the UCI protocol. Connect it to any UCI-compatible GUI (Arena, C
 
 ### Tests
 
-Tests use Google Test and are built separately via CMake:
+Tests use Google Test and are built separately:
 
 ```bash
 make test
 ```
 
-This configures a CMake build in `build-test/`, compiles three test executables, runs `test_perft` directly (streaming per-case output to stdout), then runs the remaining suites via `ctest`.
+This configures a CMake build in `build-test/`, compiles three test executables, and runs them via `ctest`. The suites are:
 
-| Executable | Coverage | Cases |
-|---|---|---|
-| `test_perft` | Move-generation node counts (D1–D6) | 778 |
-| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move | 24 |
-| `test_see` | Static exchange evaluation | 2 |
-
-The test executables can also be run individually after building:
-
-```bash
-cmake -S . -B build-test
-cmake --build build-test --parallel
-./build-test/test_perft
-./build-test/test_bratko_kopec
-./build-test/test_see
-```
+| Executable | Coverage |
+|---|---|
+| `test_perft` | Move-generation node counts (D1–D5, 649 cases) |
+| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move |
+| `test_see` | Static exchange evaluation |
 
 ---
 
@@ -85,7 +75,7 @@ cmake --build build-test --parallel
 
 ### Board representation
 
-`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, and a `state` field (`move_undo_t`) containing the Zobrist hash, checker bitboard, castling rights, en-passant square, and half/full-move counters.
+`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, en-passant square, and half/full-move counters.
 
 `bitboard_t` is a `typedef uint64_t` in LERF mapping: bit 0 = a1, bit 63 = h8. Direct bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`) are used throughout; the `BB_FOREACH` macro iterates set bits from LSB to MSB.
 
@@ -107,7 +97,7 @@ cmake --build build-test --parallel
 
 ### Attack generation
 
-`bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`.
+`bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`. A classical ray-subtraction fallback is available for non-BMI2 builds (`USE_PEXT_BITBOARDS=0`).
 
 Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation, allowing the legal-move generator to filter pinned pieces efficiently.
 
@@ -115,11 +105,11 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 `game_t` ([include/game.h](include/game.h)) owns all search state:
 
-- A transposition table (64 MB)
+- A single transposition table (64 MB)
 - A history heuristic table indexed by `(ply, from+to)`
-- An opening book (sorted array + `bsearch` after initialization)
+- An opening book of moves indexed by Zobrist hash
 - A chess clock
-- A `move_undo_stack_t` for make/undo and repetition detection
+- A position history stack for repetition detection
 
 Search runs on a background `thrd_t` worker thread so the UCI `stop` command can interrupt it immediately.
 
@@ -144,13 +134,11 @@ Move ordering: transposition-table move first, then MVV-LVA (victim value × 100
 - Mobility
 - King safety (pawn shelter, attacking pieces near the king)
 
-Lazy evaluation returns early when the score is clearly outside the alpha-beta window.
-
 Static exchange evaluation ([include/static_exchange_evaluation.h](include/static_exchange_evaluation.h)) estimates the material outcome of a capture sequence for move ordering.
 
 ### Opening book
 
-The opening book is loaded from a plain-text file (one line of play per line, moves in UCI or SAN notation). During loading, positions are accumulated then sorted by Zobrist hash; at runtime, lookup is O(log n) via `bsearch`. Move selection is randomised with a xorshift64 PRNG.
+The opening book is loaded from a plain-text file (one line of play per line, moves in UCI notation). Move selection is randomised with a xorshift64 PRNG seeded from program start time.
 
 ---
 
