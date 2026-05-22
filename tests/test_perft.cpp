@@ -12,6 +12,7 @@ extern "C"
 #include "position.h"
 }
 
+#include <chrono>
 #include <cinttypes>
 #include <cstdio>
 #include <cstring>
@@ -94,7 +95,19 @@ TEST_P(PerftTest, NodeCount)
 {
     const PerftCase &tc  = GetParam();
     position_t       pos = position_from_string(tc.fen.c_str());
-    EXPECT_EQ(count_nodes(&pos, tc.depth), tc.expected) << "FEN: " << tc.fen << "  depth: " << tc.depth;
+
+    auto     t0    = std::chrono::steady_clock::now();
+    uint64_t nodes = count_nodes(&pos, tc.depth);
+    auto     t1    = std::chrono::steady_clock::now();
+
+    double elapsed_s = std::chrono::duration<double>(t1 - t0).count();
+    double nps       = elapsed_s > 0.0 ? nodes / elapsed_s : 0.0;
+
+    std::printf("  %-72s  D%d  %12" PRIu64 "  %7.3fs  %10.0f nps\n",
+                tc.fen.c_str(), tc.depth, nodes, elapsed_s, nps);
+    std::fflush(stdout);
+
+    EXPECT_EQ(nodes, tc.expected) << "FEN: " << tc.fen << "  depth: " << tc.depth;
 }
 
 INSTANTIATE_TEST_SUITE_P(
