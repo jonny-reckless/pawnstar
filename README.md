@@ -65,7 +65,7 @@ This configures a CMake build in `build-test/`, compiles three test executables,
 
 | Executable | Coverage |
 |---|---|
-| `test_perft` | Move-generation node counts (D1–D5, 649 cases) |
+| `test_perft` | Move-generation node counts (D1–D6, 778 cases) |
 | `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move |
 | `test_see` | Static exchange evaluation |
 

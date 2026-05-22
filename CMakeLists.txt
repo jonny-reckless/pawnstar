@@ -31,7 +31,7 @@ add_custom_command(
 add_custom_target(generated_data DEPENDS ${GENERATED_DATA})
 
 # ─── Engine static library ───────────────────────────────────────────────────
-# Excludes main.c (entry point) and tests_*.c (embedded UCI test runners).
+# Excludes main.c (entry point).
 add_library(engine STATIC
     src/chess_clock.c
     src/debug_hashtable.c

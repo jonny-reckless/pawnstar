@@ -70,9 +70,7 @@ static std::vector<PerftCase> build_cases()
         std::strncpy(rest, semi + 1, sizeof(rest) - 1);
         rest[sizeof(rest) - 1] = '\0';
 
-        char *saveptr = nullptr;
-        char *tok     = std::strtok(rest, ";");
-        (void)saveptr;
+        char *tok = std::strtok(rest, ";");
         while (tok)
         {
             int      depth;

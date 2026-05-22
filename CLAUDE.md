@@ -27,7 +27,7 @@ Or build once and run individually:
 ```bash
 cmake -S . -B build-test
 cmake --build build-test --parallel
-./build-test/test_perft          # 649 perft node-count cases (D1–D5)
+./build-test/test_perft          # 778 perft node-count cases (D1–D6)
 ./build-test/test_bratko_kopec   # 24 Bratko-Kopec search positions
 ./build-test/test_see            # static exchange evaluation
 ```
