@@ -41,7 +41,6 @@ add_library(engine STATIC
     src/history_table.c
     src/move.c
     src/opening_book.c
-    src/perft_results.c
     src/pins.c
     src/position.c
     src/search_alphabeta.c
@@ -62,8 +61,8 @@ target_compile_definitions(engine PRIVATE
 # ─── Test executables ────────────────────────────────────────────────────────
 enable_testing()
 
-function(add_engine_test name src)
-    add_executable(${name} ${src})
+function(add_engine_test name)
+    add_executable(${name} ${ARGN})
     target_link_libraries(${name} PRIVATE engine gtest_main)
     target_compile_options(${name} PRIVATE -mbmi2)
     target_compile_definitions(${name} PRIVATE
@@ -74,6 +73,6 @@ function(add_engine_test name src)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
-add_engine_test(test_perft         tests/test_perft.cpp)
+add_engine_test(test_perft         tests/test_perft.cpp tests/perft_results.c)
 add_engine_test(test_bratko_kopec  tests/test_bratko_kopec.cpp)
 add_engine_test(test_see           tests/test_see.cpp)
