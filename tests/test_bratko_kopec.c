@@ -1,33 +1,26 @@
-/// @file Google Test suite for search correctness: Bratko-Kopec tactical positions.
+/// @file Standalone Bratko-Kopec search position tests.
 ///
-/// Each test searches to the minimum depth at which the engine finds the known
-/// best move (established by running the engine to depth 12 as a reference).
-/// Per-position depths prevent unnecessarily deep searches while ensuring every
-/// test exercises the correct answer.
-///
-/// Search output (UCI info lines) is printed to stdout during the run; this is
-/// expected and does not indicate a failure.
+/// Each test searches to the minimum depth at which the engine reliably finds
+/// the known best move (established by running to depth 12 as a reference).
 
-extern "C"
-{
+#include <stdio.h>
+#include <string.h>
+
 #include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
 #include "move.h"
 #include "search.h"
-}
 
-#include <gtest/gtest.h>
-
-struct BKCase
+typedef struct
 {
     const char *fen;
-    const char *expected_move; // UCI long-algebraic notation (depth-12 reference)
-    int         depth;         // minimum depth needed to find this move
-};
+    const char *expected_move;
+    int         depth;
+} bk_case_t;
 
 // clang-format off
-static const BKCase CASES[] = {
+static const bk_case_t CASES[] = {
     {"1k1r4/pp1b1R02/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",                   "d6d1", 10},
     {"3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",                   "f4f5", 10},
     {"2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -",      "h8g8", 10},
@@ -55,39 +48,41 @@ static const BKCase CASES[] = {
 };
 // clang-format on
 
-// ─── Test fixture ─────────────────────────────────────────────────────────────
+static const int NUM_CASES = (int)(sizeof(CASES) / sizeof(CASES[0]));
 
-class BratkoKopecTest : public testing::TestWithParam<BKCase>
+int main(void)
 {
-  protected:
-    game_t game;
-    void   SetUp() override
+    int failures = 0;
+
+    for (int i = 0; i < NUM_CASES; ++i)
     {
+        const bk_case_t *tc = &CASES[i];
+
+        game_t game;
         game_init(&game);
-    }
-    void TearDown() override
-    {
+        game_new_game(&game, tc->fen);
+        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control.depth      = tc->depth;
+
+        debug_x_clear();
+        move_t best = search_root_node(&game);
+        debug_x_write();
+
+        char got[8] = {0};
+        if (best != move_none())
+            move_to_string(best, got, sizeof(got));
+
+        int pass = (best != move_none()) && (strcmp(got, tc->expected_move) == 0);
+        printf("  [%s]  pos%d  got=%-6s  expected=%-6s  %s\n",
+               pass ? "PASS" : "FAIL", i + 1, got, tc->expected_move, tc->fen);
+        fflush(stdout);
+
+        if (!pass)
+            failures++;
+
         game_free(&game);
     }
-};
 
-TEST_P(BratkoKopecTest, BestMove)
-{
-    const BKCase &tc = GetParam();
-    game_new_game(&game, tc.fen);
-    game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-    game.time_control.depth      = tc.depth;
-    debug_x_clear();
-    move_t best = search_root_node(&game);
-    debug_x_write();
-    ASSERT_NE(best, move_none()) << "No move returned for FEN: " << tc.fen;
-
-    char got[8];
-    move_to_string(best, got, sizeof(got));
-    EXPECT_STREQ(got, tc.expected_move) << "FEN: " << tc.fen;
+    printf("\n%d/%d passed\n", NUM_CASES - failures, NUM_CASES);
+    return failures > 0 ? 1 : 0;
 }
-
-INSTANTIATE_TEST_SUITE_P(BratkoKopec, BratkoKopecTest, testing::ValuesIn(CASES),
-                         [](const testing::TestParamInfo<BKCase> &info) {
-                             return "pos" + std::to_string(info.index + 1);
-                         });
