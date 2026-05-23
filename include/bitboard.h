@@ -12,7 +12,7 @@ typedef uint64_t bitboard_t;
 // ---------------------------------------------------------------------------
 
 /// @brief Return a bitboard with only square @p s set.
-static inline bitboard_t bitboard_from_square(square_t s)
+static inline __attribute__((always_inline)) bitboard_t bitboard_from_square(square_t s)
 {
     return 1ULL << s;
 }
@@ -22,25 +22,25 @@ static inline bitboard_t bitboard_from_square(square_t s)
 // ---------------------------------------------------------------------------
 
 /// @brief Index of the least-significant set bit. Undefined behaviour if @p b is 0.
-static inline square_t lsb(bitboard_t b)
+static inline __attribute__((always_inline)) square_t lsb(bitboard_t b)
 {
     return (square_t)__builtin_ctzll(b);
 }
 
 /// @brief Index of the most-significant set bit. Undefined behaviour if @p b is 0.
-static inline square_t msb(bitboard_t b)
+static inline __attribute__((always_inline)) square_t msb(bitboard_t b)
 {
     return (square_t)(63 - __builtin_clzll(b));
 }
 
 /// @brief Number of set bits (population count).
-static inline int popcount(bitboard_t b)
+static inline __attribute__((always_inline)) int popcount(bitboard_t b)
 {
     return __builtin_popcountll(b);
 }
 
 /// @brief Return @p b with all bits cleared except the least-significant one.
-static inline bitboard_t isolate_lsb(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t isolate_lsb(bitboard_t b)
 {
     return b & (0ULL - b);
 }
@@ -53,42 +53,42 @@ static const uint64_t BB_NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; ///< All squares ex
 static const uint64_t BB_NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< All squares except file H; prevents east-shift wrap.
 
 /// @brief Shift all squares one step north (towards rank 8).
-static inline bitboard_t bitboard_shift_north(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_north(bitboard_t b)
 {
     return b << 8;
 }
 /// @brief Shift all squares one step north-east, masking the h-file to prevent wrap.
-static inline bitboard_t bitboard_shift_northeast(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_northeast(bitboard_t b)
 {
     return (b & BB_NOT_FILE_H) << 9;
 }
 /// @brief Shift all squares one step east, masking the h-file to prevent wrap.
-static inline bitboard_t bitboard_shift_east(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_east(bitboard_t b)
 {
     return (b & BB_NOT_FILE_H) << 1;
 }
 /// @brief Shift all squares one step south-east, masking the h-file to prevent wrap.
-static inline bitboard_t bitboard_shift_southeast(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_southeast(bitboard_t b)
 {
     return (b & BB_NOT_FILE_H) >> 7;
 }
 /// @brief Shift all squares one step south (towards rank 1).
-static inline bitboard_t bitboard_shift_south(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_south(bitboard_t b)
 {
     return b >> 8;
 }
 /// @brief Shift all squares one step south-west, masking the a-file to prevent wrap.
-static inline bitboard_t bitboard_shift_southwest(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_southwest(bitboard_t b)
 {
     return (b & BB_NOT_FILE_A) >> 9;
 }
 /// @brief Shift all squares one step west, masking the a-file to prevent wrap.
-static inline bitboard_t bitboard_shift_west(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_west(bitboard_t b)
 {
     return (b & BB_NOT_FILE_A) >> 1;
 }
 /// @brief Shift all squares one step north-west, masking the a-file to prevent wrap.
-static inline bitboard_t bitboard_shift_northwest(bitboard_t b)
+static inline __attribute__((always_inline)) bitboard_t bitboard_shift_northwest(bitboard_t b)
 {
     return (b & BB_NOT_FILE_A) << 7;
 }

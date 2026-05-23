@@ -26,10 +26,10 @@ single_move_result_t search_single_move(game_t *game, int depth, int ply, int al
         INCREMENT("extensions promotion");
         break;
 
-    case MOVE_EP_CAPTURE:
-        ++child_depth;
-        INCREMENT("extensions ep capture");
-        break;
+        // case MOVE_EP_CAPTURE:
+        //     ++child_depth;
+        //     INCREMENT("extensions ep capture");
+        //     break;
 
     default:
         break;
@@ -69,8 +69,9 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
     if (!position_is_null_move(position) && !position_is_in_check(position) && beta == alpha + 1 &&
         popcount(position_pieces_of_color(position, color)) > 3)
     {
-        const int eval_score = evaluate_position(game, alpha, beta);
-        if (eval_score >= beta)
+        const int pst_score = color == WHITE ? position->state.scores[WHITE] - position->state.scores[BLACK]
+                                             : position->state.scores[BLACK] - position->state.scores[WHITE];
+        if (pst_score >= beta + 100)
         {
             INCREMENT("null move");
             variation_t dummy;
@@ -80,14 +81,14 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
             game_undo_null_move(game);
             if (game->is_cancel_pending)
             {
-                return (null_move_result_t){SEARCH_CANCELLED_SCORE, eval_score};
+                return (null_move_result_t){SEARCH_CANCELLED_SCORE, pst_score};
             }
             if (score >= beta)
             {
-                return (null_move_result_t){beta, eval_score};
+                return (null_move_result_t){beta, pst_score};
             }
             INCREMENT("null move fails");
-            return (null_move_result_t){alpha, eval_score};
+            return (null_move_result_t){alpha, pst_score};
         }
     }
     return (null_move_result_t){alpha, ALPHA};
@@ -233,12 +234,17 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         if (i > 3 && !position_is_in_check(pos) && depth > 2 && beta == alpha + 1 && move_captured(move) == NONE &&
             move_piece(move) != PAWN)
         {
-            INCREMENT("late move reduction");
+            INCREMENT("late move reduction 1");
             --lmr_depth;
-            if (depth > 3 && i > 6)
+            if (i > 6)
             {
-                INCREMENT("late move reduction extreme");
+                INCREMENT("late move reduction 2");
                 --lmr_depth;
+                if (history_table_get_count(&game->history_table, ply, move) == 0)
+                {
+                    INCREMENT("late move reduction 3");
+                    --lmr_depth;
+                }
             }
         }
 

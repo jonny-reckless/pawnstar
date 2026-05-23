@@ -40,56 +40,60 @@ static inline move_t move_none(void)
 }
 
 /// @brief Build a non-capture move with an explicit type (e.g. castling, double push, quiet promotion).
-static inline move_t move_make_with_type(square_t from, square_t to, piece_t piece, move_type_t type)
+static inline __attribute__((always_inline)) move_t move_make_with_type(square_t from, square_t to, piece_t piece,
+                                                                        move_type_t type)
 {
     return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12) | ((int64_t)type << 18);
 }
 
 /// @brief Internal builder: pack all five move fields into a move_t.
-static inline move_t move_make_capture_(square_t from, square_t to, piece_t piece, move_type_t type, piece_t captured)
+static inline __attribute__((always_inline)) move_t move_make_capture_(square_t from, square_t to, piece_t piece,
+                                                                       move_type_t type, piece_t captured)
 {
     return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12) | ((int64_t)captured << 15) |
            ((int64_t)type << 18);
 }
 
 /// @brief Quiet move (no capture, no special flag).
-static inline move_t move_non_capture(square_t from, square_t to, piece_t piece)
+static inline __attribute__((always_inline)) move_t move_non_capture(square_t from, square_t to, piece_t piece)
 {
     return (int64_t)to | ((int64_t)from << 6) | ((int64_t)piece << 12);
 }
 
 /// @brief Normal capture.
-static inline move_t move_capture(square_t from, square_t to, piece_t piece, piece_t captured)
+static inline __attribute__((always_inline)) move_t move_capture(square_t from, square_t to, piece_t piece,
+                                                                 piece_t captured)
 {
     return move_make_capture_(from, to, piece, MOVE_CAPTURE, captured);
 }
 
 /// @brief Promotion, optionally with a capture (@p captured may be NONE).
-static inline move_t move_promotion(square_t from, square_t to, piece_t promoted, piece_t captured)
+static inline __attribute__((always_inline)) move_t move_promotion(square_t from, square_t to, piece_t promoted,
+                                                                   piece_t captured)
 {
     return move_make_capture_(from, to, PAWN, (move_type_t)promoted, captured);
 }
 
 /// @brief Quiet promotion (pawn reaches the back rank without capturing).
-static inline move_t move_promotion_quiet(square_t from, square_t to, piece_t promoted)
+static inline __attribute__((always_inline)) move_t move_promotion_quiet(square_t from, square_t to, piece_t promoted)
 {
     return move_make_with_type(from, to, PAWN, (move_type_t)promoted);
 }
 
 /// @brief Castling move; the rook's path is derived from the king's @p to square.
-static inline move_t move_castling(square_t from, square_t to)
+static inline __attribute__((always_inline)) move_t move_castling(square_t from, square_t to)
 {
     return move_make_with_type(from, to, KING, MOVE_CASTLING);
 }
 
 /// @brief En-passant capture; the captured pawn's square is derived from @p to.
-static inline move_t move_ep_capture(square_t from, square_t to)
+static inline __attribute__((always_inline)) move_t move_ep_capture(square_t from, square_t to)
 {
     return move_make_capture_(from, to, PAWN, MOVE_EP_CAPTURE, PAWN);
 }
 
 /// @brief Pawn double-push; the en-passant target square is set to the skipped square.
-static inline move_t move_double_push(square_t from, square_t to)
+static inline __attribute__((always_inline)) move_t move_double_push(square_t from, square_t to)
 {
     return move_make_with_type(from, to, PAWN, MOVE_PAWN_DOUBLE_PUSH);
 }
@@ -99,37 +103,37 @@ static inline move_t move_double_push(square_t from, square_t to)
 // ---------------------------------------------------------------------------
 
 /// @brief Destination square (bits 0–5).
-static inline square_t move_to(move_t m)
+static inline __attribute__((always_inline)) square_t move_to(move_t m)
 {
     return (square_t)(m & 0x3F);
 }
 
 /// @brief Origin square (bits 6–11).
-static inline square_t move_from(move_t m)
+static inline __attribute__((always_inline)) square_t move_from(move_t m)
 {
     return (square_t)((m >> 6) & 0x3F);
 }
 
 /// @brief Move classification (bits 18–21).
-static inline move_type_t move_type(move_t m)
+static inline __attribute__((always_inline)) move_type_t move_type(move_t m)
 {
     return (move_type_t)((m >> 18) & 0x0F);
 }
 
 /// @brief Piece being moved (bits 12–14).
-static inline piece_t move_piece(move_t m)
+static inline __attribute__((always_inline)) piece_t move_piece(move_t m)
 {
     return (piece_t)((m >> 12) & 0x07);
 }
 
 /// @brief Piece captured; NONE for quiet moves, PAWN for en-passant (bits 15–17).
-static inline piece_t move_captured(move_t m)
+static inline __attribute__((always_inline)) piece_t move_captured(move_t m)
 {
     return (piece_t)((m >> 15) & 0x07);
 }
 
 /// @brief Promotion target; NONE if the move is not a promotion.
-static inline piece_t move_promoted(move_t m)
+static inline __attribute__((always_inline)) piece_t move_promoted(move_t m)
 {
     switch (move_type(m))
     {
@@ -147,13 +151,13 @@ static inline piece_t move_promoted(move_t m)
 }
 
 /// @brief Move-ordering score (bits 32–63); higher scores are searched first.
-static inline int move_score(move_t m)
+static inline __attribute__((always_inline)) int move_score(move_t m)
 {
     return (int)(m >> 32);
 }
 
 /// @brief Combined origin+destination index (bits 0–11); used as a history-table key.
-static inline int move_from_to(move_t m)
+static inline __attribute__((always_inline)) int move_from_to(move_t m)
 {
     return (int)(m & 0xFFF);
 }
@@ -163,13 +167,13 @@ static inline int move_from_to(move_t m)
 // ---------------------------------------------------------------------------
 
 /// @brief Set the move-ordering score; bits 0–31 (the move fields) are unchanged.
-static inline void move_assign_score(move_t *m, int score)
+static inline __attribute__((always_inline)) void move_assign_score(move_t *m, int score)
 {
     *m = (*m & 0xFFFFFFFF) | ((int64_t)score << 32);
 }
 
 /// @brief Mark @p m as giving check (sets bit 22).
-static inline void move_gives_check(move_t *m)
+static inline __attribute__((always_inline)) void move_gives_check(move_t *m)
 {
     *m |= (1 << 22);
 }
@@ -179,7 +183,7 @@ static inline void move_gives_check(move_t *m)
 // ---------------------------------------------------------------------------
 
 /// @brief True if @p a and @p b encode the same move, ignoring their sort scores.
-static inline bool move_equals(move_t a, move_t b)
+static inline __attribute__((always_inline)) bool move_equals(move_t a, move_t b)
 {
     return (a & 0x3FFFFF) == (b & 0x3FFFFF);
 }
@@ -203,7 +207,7 @@ typedef struct
 } move_list_t;
 
 /// @brief Append @p m to @p self. UB if the list is already at capacity.
-static inline void move_list_push_back(move_list_t *self, move_t m)
+static inline __attribute__((always_inline)) void move_list_push_back(move_list_t *self, move_t m)
 {
     self->items[self->size++] = m;
 }

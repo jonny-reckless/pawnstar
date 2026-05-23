@@ -54,7 +54,6 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            history_table_record_good_move(&game->history_table, ply, move);
             return score;
         }
         if (score > best_score)
@@ -64,7 +63,6 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                history_table_record_good_move(&game->history_table, ply, move);
             }
         }
     }

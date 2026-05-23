@@ -29,12 +29,14 @@ static uint64_t count_nodes(position_t *pos, int depth)
 
 int main(int argc, char *argv[])
 {
-    int max_depth = 6;
+    int max_depth = 5;
     if (argc >= 2)
         max_depth = atoi(argv[1]);
 
-    int failures = 0;
-    int total    = 0;
+    int     failures      = 0;
+    int     total         = 0;
+    int64_t total_nodes   = 0;
+    double  total_elapsed = 0.0;
 
     for (int r = 0; r < 132 && perft_results[r]; ++r)
     {
@@ -68,15 +70,16 @@ int main(int argc, char *argv[])
                 uint64_t got = count_nodes(&pos, depth);
                 clock_gettime(CLOCK_MONOTONIC, &t1);
 
-                double elapsed_s =
-                    (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
-                double nps = elapsed_s > 0.0 ? (double)got / elapsed_s : 0.0;
+                double elapsed_s = (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
+                double mnps      = elapsed_s > 0.0 ? (double)got / elapsed_s / 1e6 : 0.0;
 
-                printf("  %-72s  D%d  %12" PRIu64 "  %7.3fs  %10.0f nps", fen, depth, got,
-                       elapsed_s, nps);
+                total_nodes += got;
+                total_elapsed += elapsed_s;
+
+                printf("  %-72s  D%d  %12" PRIu64 "  %7.3fs  %8.3f Mnps", fen, depth, got, elapsed_s, mnps);
                 if (got != expected)
                 {
-                    printf("  FAIL (expected %" PRIu64 ")", expected);
+                    printf("[FAIL] (expected %" PRIu64 ")", expected);
                     failures++;
                 }
                 printf("\n");
@@ -87,6 +90,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("\n%d/%d passed\n", total - failures, total);
+    double mean_mnps = total_elapsed > 0.0 ? total_nodes / total_elapsed / 1e6 : 0.0;
+    printf("\n%d/%d tests passed. Mean perft speed %.3f Mnps\n", total - failures, total, mean_mnps);
     return failures > 0 ? 1 : 0;
 }

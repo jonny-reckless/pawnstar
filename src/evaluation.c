@@ -129,18 +129,26 @@ static inline pawn_structure_t determine_pawn_structure(const position_t *pos, c
     const bitboard_t enemy_pawns    = pos->pawns ^ friendly_pawns;
     pawn_structure_t ps             = {0};
 
-    const bitboard_t *passed_pawn_mask    = color == WHITE ? PASSED_PAWN_MASK_WHITE : PASSED_PAWN_MASK_BLACK;
-    const bitboard_t *isolated_pawn_mask  = color == WHITE ? ISOLATED_PAWN_MASK_WHITE : ISOLATED_PAWN_MASK_BLACK;
-    const bitboard_t *supported_pawn_mask = color == WHITE ? SUPPORTED_PAWN_MASK_WHITE : SUPPORTED_PAWN_MASK_BLACK;
-    const bitboard_t *doubled_pawn_mask   = color == WHITE ? DOUBLED_PAWN_MASK_WHITE : DOUBLED_PAWN_MASK_BLACK;
+    const bitboard_t *passed_pawn_mask;
+    const bitboard_t *isolated_pawn_mask;
+    const bitboard_t *supported_pawn_mask;
+    const bitboard_t *doubled_pawn_mask;
 
     if (color == WHITE)
     {
+        passed_pawn_mask    = PASSED_PAWN_MASK_WHITE;
+        isolated_pawn_mask  = ISOLATED_PAWN_MASK_WHITE;
+        supported_pawn_mask = SUPPORTED_PAWN_MASK_WHITE;
+        doubled_pawn_mask   = DOUBLED_PAWN_MASK_WHITE;
         ps.defended_pawns =
             friendly_pawns & (bitboard_shift_northwest(friendly_pawns) | bitboard_shift_northeast(friendly_pawns));
     }
     else
     {
+        passed_pawn_mask    = PASSED_PAWN_MASK_BLACK;
+        isolated_pawn_mask  = ISOLATED_PAWN_MASK_BLACK;
+        supported_pawn_mask = SUPPORTED_PAWN_MASK_BLACK;
+        doubled_pawn_mask   = DOUBLED_PAWN_MASK_BLACK;
         ps.defended_pawns =
             friendly_pawns & (bitboard_shift_southwest(friendly_pawns) | bitboard_shift_southeast(friendly_pawns));
     }
@@ -327,13 +335,11 @@ int evaluate_position(const game_t *game, int alpha, int beta)
         return DRAW_SCORE;
     }
     int scores[2];
-    scores[WHITE] = position->state.scores[WHITE];
-    scores[BLACK] = position->state.scores[BLACK];
-    // See if the PST score is sufficient to avoid evaluation altogether.
-    int              score         = position->state.scores[WHITE] - game->position.state.scores[BLACK];
+    scores[WHITE]                  = position->state.scores[WHITE];
+    scores[BLACK]                  = position->state.scores[BLACK];
     static const int multiplier[2] = {1, -1}; // WHITE, BLACK
     const color_t    color         = position_color_to_move(position);
-    score *= multiplier[color];
+    int              score         = (scores[WHITE] - scores[BLACK]) * multiplier[color];
     if (score > beta + 200)
     {
         INCREMENT("eval material cutoff beta");

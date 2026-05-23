@@ -54,10 +54,10 @@ prep:
 
 clean:
 	rm -f $(PROGRAM_EXE) $(LIB) $(LIB_OBJECTS) $(MAIN_OBJECTS) $(DEPS) $(GENERATED_DATA) $(GENERATOR_EXE)
-	rm -rf $(TEST_BUILD_DIR)
+	rm -rf $(TEST_BUILD_DIR) $(BUILD_DIR)
 
 # ─── Main build ──────────────────────────────────────────────────────────────
-$(BUILD_DIR)/%.o: src/%.c
+$(BUILD_DIR)/%.o: src/%.c | prep
 	$(CC) -c $(CFLAGS) -MMD -MP -o $@ $<
 
 $(LIB): $(LIB_OBJECTS)
@@ -77,6 +77,8 @@ $(GENERATED_DATA): $(GENERATOR_EXE)
 
 # ─── Test build ──────────────────────────────────────────────────────────────
 test: prep $(LIB) $(TEST_EXES)
+
+check: test
 	$(TEST_BUILD_DIR)/test_perft 5
 	$(TEST_BUILD_DIR)/test_bratko_kopec
 	$(TEST_BUILD_DIR)/test_see
@@ -84,16 +86,7 @@ test: prep $(LIB) $(TEST_EXES)
 $(TEST_BUILD_DIR):
 	mkdir -p $@
 
-$(TEST_BUILD_DIR)/test_perft.o: tests/test_perft.c | $(TEST_BUILD_DIR)
-	$(CC) -c $(CFLAGS) -o $@ $<
-
-$(TEST_BUILD_DIR)/perft_results.o: tests/perft_results.c | $(TEST_BUILD_DIR)
-	$(CC) -c $(CFLAGS) -o $@ $<
-
-$(TEST_BUILD_DIR)/test_see.o: tests/test_see.c | $(TEST_BUILD_DIR)
-	$(CC) -c $(CFLAGS) -o $@ $<
-
-$(TEST_BUILD_DIR)/test_bratko_kopec.o: tests/test_bratko_kopec.c | $(TEST_BUILD_DIR)
+$(TEST_BUILD_DIR)/%.o: tests/%.c | $(TEST_BUILD_DIR)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(TEST_BUILD_DIR)/test_perft: $(TEST_BUILD_DIR)/test_perft.o $(TEST_BUILD_DIR)/perft_results.o $(LIB)
