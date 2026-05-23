@@ -15,7 +15,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent max ply");
         return evaluate_position(game, alpha, beta);
     }
-    if (position_is_in_check(&game->position))
+    if (position_is_in_check(game->position))
     {
         INCREMENT("quiescent checks");
         variation_t dummy;
@@ -36,7 +36,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
     }
     int best_score = score;
 
-    move_list_t move_list = position_generate_legal_captures(&game->position);
+    move_list_t move_list = position_generate_legal_captures(game->position);
     game_score_and_sort_moves(game, &move_list, ply);
 
     for (int i = 0; i < move_list.size; ++i)
@@ -45,7 +45,7 @@ int search_quiescent(game_t *game, int depth, int ply, int alpha, int beta)
 
         game_play_move(game, move);
         score = -search_quiescent(game, depth - 1, ply + 1, -beta, -alpha);
-        game_undo_move(game, move);
+        game_undo_move(game);
         if (game->is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;

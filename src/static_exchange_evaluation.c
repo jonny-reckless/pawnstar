@@ -136,9 +136,8 @@ static int evaluate_swap_off(see_board_t *bb, square_t location, color_t color, 
 
 see_result_t evaluate_static_exchange(const position_t *src_position, move_t move)
 {
-    position_t  dst_position = *src_position;
-    move_undo_t undo;
-    position_make_move(&dst_position, move, &undo);
+    position_t dst_position;
+    position_make_move(&dst_position, src_position, move);
     const bool is_checking  = position_is_in_check(&dst_position);
 
     see_board_t bb;

@@ -29,13 +29,13 @@ static inline int abs_int(int a)
 move_t search_root_node(game_t *game)
 {
     // Check opening book first.
-    move_t book_move = opening_book_get_move(&game->book, game->position.state.hash);
+    move_t book_move = opening_book_get_move(&game->book, game->position->hash);
     if (!move_equals(book_move, move_none()))
     {
         return book_move;
     }
 
-    move_list_t move_list = position_generate_legal_moves(&game->position);
+    move_list_t move_list = position_generate_legal_moves(game->position);
     if (move_list.size == 0)
     {
         return move_none();
@@ -58,7 +58,7 @@ move_t search_root_node(game_t *game)
         }
         else
         {
-            const int num_moves_to_go = max_int(40 - (int)(game->position.state.full_move_count), 5);
+            const int num_moves_to_go = max_int(40 - (int)(game->position->move_counter), 5);
             ms_allocated              = game->time_control.ms_remaining / num_moves_to_go;
         }
         ms_timeout = max_int(100, min_int(ms_allocated * 2, game->time_control.ms_remaining - 1000));

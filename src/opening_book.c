@@ -87,7 +87,7 @@ static bool parse_line_of_play(opening_book_t *self, char *line)
         {
             return true;
         }
-        const zobrist_t   hash  = position.state.hash;
+        const zobrist_t   hash  = position.hash;
         const move_list_t legal = position_generate_legal_moves(&position);
         move_t            found = move_none();
         char              move_string[8];
@@ -111,8 +111,9 @@ static bool parse_line_of_play(opening_book_t *self, char *line)
             entry = create_entry(self, hash);
         }
         entry_push_move(entry, found);
-        move_undo_t undo;
-        position_make_move(&position, found, &undo);
+        position_t next;
+        position_make_move(&next, &position, found);
+        position = next;
     }
     return true;
 }
@@ -164,7 +165,7 @@ move_t opening_book_get_move(opening_book_t *self, zobrist_t hash)
 
 void opening_book_display_available_moves(const opening_book_t *self, const position_t *position)
 {
-    const book_entry_t *entry = find_entry(self, position->state.hash);
+    const book_entry_t *entry = find_entry(self, position->hash);
     if (!entry)
     {
         return;

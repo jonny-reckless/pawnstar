@@ -12,7 +12,7 @@
 single_move_result_t search_single_move(game_t *game, int depth, int ply, int alpha, int beta, move_t move,
                                         variation_t *pv, int move_index)
 {
-    const position_t *position     = &game->position;
+    const position_t *position     = game->position;
     const bool        was_in_check = position_is_in_check(position);
 
     int child_depth = depth - 1;
@@ -36,7 +36,7 @@ single_move_result_t search_single_move(game_t *game, int depth, int ply, int al
     }
 
     game_play_move(game, move);
-    const bool is_checking = position_is_in_check(&game->position);
+    const bool is_checking = position_is_in_check(game->position);
     int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
@@ -52,7 +52,7 @@ single_move_result_t search_single_move(game_t *game, int depth, int ply, int al
     {
         score = -search(game, child_depth, ply + 1, -beta, -alpha, pv);
     }
-    game_undo_move(game, move);
+    game_undo_move(game);
     return (single_move_result_t){score, is_checking};
 }
 
@@ -64,13 +64,13 @@ typedef struct
 
 static inline null_move_result_t attempt_null_move(game_t *game, int depth, int ply, int alpha, int beta)
 {
-    const position_t *position = &game->position;
+    const position_t *position = game->position;
     const color_t     color    = position_color_to_move(position);
     if (!position_is_null_move(position) && !position_is_in_check(position) && beta == alpha + 1 &&
         popcount(position_pieces_of_color(position, color)) > 3)
     {
-        const int pst_score = color == WHITE ? position->state.scores[WHITE] - position->state.scores[BLACK]
-                                             : position->state.scores[BLACK] - position->state.scores[WHITE];
+        const int pst_score = color == WHITE ? position->scores[WHITE] - position->scores[BLACK]
+                                             : position->scores[BLACK] - position->scores[WHITE];
         if (pst_score >= beta + 100)
         {
             INCREMENT("null move");
@@ -78,7 +78,7 @@ static inline null_move_result_t attempt_null_move(game_t *game, int depth, int 
             variation_clear(&dummy);
             game_make_null_move(game);
             int score = -search(game, depth - 4, ply + 1, -beta, -alpha, &dummy);
-            game_undo_null_move(game);
+            game_undo_move(game);
             if (game->is_cancel_pending)
             {
                 return (null_move_result_t){SEARCH_CANCELLED_SCORE, pst_score};
@@ -105,7 +105,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         return SEARCH_CANCELLED_SCORE;
     }
 
-    const position_t *position = &game->position;
+    const position_t *position = game->position;
     if (position_is_draw_by_material(position) || game_is_draw_by_fifty_moves(game) || game_is_draw_by_repetition(game))
     {
         return DRAW_SCORE;
@@ -124,7 +124,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
 
     // transposition_t table lookup.
     transposition_t transposition;
-    bool has_transposition = transposition_table_find(&game->transposition_table, position->state.hash, &transposition);
+    bool has_transposition = transposition_table_find(&game->transposition_table, position->hash, &transposition);
     if (has_transposition && transposition.depth >= depth)
     {
         switch ((transposition_node_type_t)transposition.node_type)
@@ -187,7 +187,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            transposition_t rec = {game->position.state.hash,
+            transposition_t rec = {game->position->hash,
                                    transposition.move,
                                    score,
                                    (int16_t)depth,
@@ -207,7 +207,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         }
     }
 
-    const position_t *pos       = &game->position;
+    const position_t *pos       = game->position;
     move_list_t       move_list = position_generate_legal_moves(pos);
     if (move_list.size == 0)
     {
@@ -262,7 +262,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            transposition_t rec = {game->position.state.hash,  move, score, (int16_t)depth,
+            transposition_t rec = {game->position->hash,  move, score, (int16_t)depth,
                                    (uint8_t)TRANSPOSITION_CUT, false};
             transposition_table_record(&game->transposition_table, &rec);
             history_table_record_good_move(&game->history_table, ply, move);
@@ -283,7 +283,7 @@ int search(game_t *game, int depth, int ply, int alpha, int beta, variation_t *p
         }
     }
 
-    const zobrist_t pos_hash = game->position.state.hash;
+    const zobrist_t pos_hash = game->position->hash;
     if (has_raised_alpha)
     {
         INCREMENT("pv nodes");

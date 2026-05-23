@@ -50,8 +50,8 @@ void game_new_game(game_t *self, const char *fen_string)
     chess_clock_init(&self->time_control);
     self->node_count        = 0;
     self->is_cancel_pending = false;
-    move_undo_stack_clear(&self->undo_stack);
-    self->position = position_from_string(fen_string);
+    self->position          = &self->positions[0];
+    self->positions[0]      = position_from_string(fen_string);
 }
 
 void game_new_game_default(game_t *self)
@@ -61,30 +61,19 @@ void game_new_game_default(game_t *self)
 
 void game_play_move(game_t *self, move_t move)
 {
-    move_undo_t undo;
-    position_make_move(&self->position, move, &undo);
-    move_undo_stack_push(&self->undo_stack, &undo);
+    position_make_move(&self->position[1], &self->position[0], move);
+    ++self->position;
 }
 
 void game_make_null_move(game_t *self)
 {
-    move_undo_t undo;
-    position_make_null_move(&self->position, &undo);
-    move_undo_stack_push(&self->undo_stack, &undo);
+    position_make_null_move(&self->position[1], &self->position[0]);
+    ++self->position;
 }
 
-void game_undo_move(game_t *self, move_t move)
+void game_undo_move(game_t *self)
 {
-    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.count - 1];
-    position_undo_move(&self->position, move, undo);
-    move_undo_stack_pop(&self->undo_stack);
-}
-
-void game_undo_null_move(game_t *self)
-{
-    const move_undo_t *undo = &self->undo_stack.items[self->undo_stack.count - 1];
-    position_undo_null_move(&self->position, undo);
-    move_undo_stack_pop(&self->undo_stack);
+    --self->position;
 }
 
 void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
@@ -101,7 +90,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
 
 bool game_is_draw_by_fifty_moves(const game_t *self)
 {
-    if (self->position.state.reversible_move_count >= 100)
+    if (self->position->half_move_clock >= 100)
     {
         INCREMENT("draws by 50 moves");
         return true;
@@ -112,19 +101,15 @@ bool game_is_draw_by_fifty_moves(const game_t *self)
 bool game_is_draw_by_repetition(const game_t *self)
 {
     int             repetitions = 2;
-    const zobrist_t hash        = self->position.state.hash;
-    const int       n           = self->undo_stack.count;
-    // undo_stack[k].hash = position hash after k-1 moves (before move k was applied).
-    // Step back by 2 half-moves at a time to compare same-side-to-move positions.
-    for (int i = n - 2; i >= 0; i -= 2)
+    const zobrist_t hash        = self->position->hash;
+    for (const position_t *p = self->position - 2; p >= self->positions; p -= 2)
     {
-        const move_undo_t *u = &self->undo_stack.items[i];
-        if (u->hash == hash && --repetitions == 0)
+        if (p->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (u->reversible_move_count == 0)
+        if (p->half_move_clock == 0)
         {
             return false;
         }
@@ -134,7 +119,7 @@ bool game_is_draw_by_repetition(const game_t *self)
 
 move_t game_play_move_from_string(game_t *self, const char *move_str)
 {
-    move_list_t move_list = position_generate_legal_moves(&self->position);
+    move_list_t move_list = position_generate_legal_moves(self->position);
     char        buf[8];
     for (int i = 0; i < move_list.size; ++i)
     {
@@ -150,7 +135,7 @@ move_t game_play_move_from_string(game_t *self, const char *move_str)
 
 bool game_is_game_over(game_t *self)
 {
-    const position_t *pos = &self->position;
+    const position_t *pos = self->position;
     if (position_is_checkmate(pos))
     {
         printf("%s\n", position_color_to_move(pos) == BLACK ? "1-0 {white mates}" : "0-1 {black mates}");

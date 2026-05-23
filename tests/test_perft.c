@@ -11,18 +11,19 @@
 
 extern const char *perft_results[132];
 
-static uint64_t count_nodes(position_t *pos, int depth)
+#define PERFT_STACK_SIZE 8
+
+static uint64_t count_nodes(position_t *stack, int sp, int depth)
 {
-    move_list_t ml = position_generate_legal_moves(pos);
+    position_t *pos = &stack[sp];
+    move_list_t ml  = position_generate_legal_moves(pos);
     if (depth <= 1)
         return (uint64_t)ml.size;
     uint64_t n = 0;
     for (int i = 0; i < ml.size; ++i)
     {
-        move_undo_t undo;
-        position_make_move(pos, ml.items[i], &undo);
-        n += count_nodes(pos, depth - 1);
-        position_undo_move(pos, ml.items[i], &undo);
+        position_make_move(&stack[sp + 1], pos, ml.items[i]);
+        n += count_nodes(stack, sp + 1, depth - 1);
     }
     return n;
 }
@@ -63,11 +64,12 @@ int main(int argc, char *argv[])
             uint64_t expected;
             if (sscanf(tok, " D%d %" SCNu64, &depth, &expected) == 2 && depth <= max_depth)
             {
-                position_t pos = position_from_string(fen);
+                position_t stack[PERFT_STACK_SIZE];
+                stack[0] = position_from_string(fen);
 
                 struct timespec t0, t1;
                 clock_gettime(CLOCK_MONOTONIC, &t0);
-                uint64_t got = count_nodes(&pos, depth);
+                uint64_t got = count_nodes(stack, 0, depth);
                 clock_gettime(CLOCK_MONOTONIC, &t1);
 
                 double elapsed_s = (double)(t1.tv_sec - t0.tv_sec) + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;

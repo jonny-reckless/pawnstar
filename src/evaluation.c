@@ -329,14 +329,14 @@ static inline int evaluate_king(const position_t *pos, color_t color, bool is_en
 int evaluate_position(const game_t *game, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    const position_t *position = &game->position;
+    const position_t *position = game->position;
     if (position_is_draw_by_material(position))
     {
         return DRAW_SCORE;
     }
     int scores[2];
-    scores[WHITE]                  = position->state.scores[WHITE];
-    scores[BLACK]                  = position->state.scores[BLACK];
+    scores[WHITE]                  = position->scores[WHITE];
+    scores[BLACK]                  = position->scores[BLACK];
     static const int multiplier[2] = {1, -1}; // WHITE, BLACK
     const color_t    color         = position_color_to_move(position);
     int              score         = (scores[WHITE] - scores[BLACK]) * multiplier[color];

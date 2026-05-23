@@ -26,7 +26,7 @@ static void handle_bookmoves(game_t *game, char **args, int argc)
 {
     (void)args;
     (void)argc;
-    opening_book_display_available_moves(&game->book, &game->position);
+    opening_book_display_available_moves(&game->book, game->position);
 }
 
 static void handle_freebook(game_t *game, char **args, int argc)
@@ -65,7 +65,7 @@ static void handle_getboard(game_t *game, char **args, int argc)
     (void)args;
     (void)argc;
     char buf[128];
-    position_to_string(&game->position, buf, sizeof(buf));
+    position_to_string(game->position, buf, sizeof(buf));
     printf("%s\n", buf);
     fflush(stdout);
 }
@@ -93,8 +93,8 @@ static void handle_go(game_t *game, char **args, int argc)
 {
     for (int i = 1; i < argc; ++i)
     {
-        if ((strcmp(args[i], "wtime") == 0 && position_color_to_move(&game->position) == WHITE) ||
-            (strcmp(args[i], "btime") == 0 && position_color_to_move(&game->position) == BLACK))
+        if ((strcmp(args[i], "wtime") == 0 && position_color_to_move(game->position) == WHITE) ||
+            (strcmp(args[i], "btime") == 0 && position_color_to_move(game->position) == BLACK))
         {
             game->time_control.clock_type   = CLOCK_STANDARD;
             game->time_control.ms_remaining = atoi(args[++i]);
