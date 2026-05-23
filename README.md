@@ -2,7 +2,7 @@
 
 A UCI chess engine written in C17, using bitboards for board representation and alpha-beta search with iterative deepening.
 
-Move generation runs at approximately **270 million positions per second** on a modern laptop (BMI2 PEXT required).
+Move generation runs at approximately **240 million positions per second** on a modern laptop (BMI2 PEXT required).
 
 ---
 
@@ -55,19 +55,27 @@ Pawnstar speaks the UCI protocol. Connect it to any UCI-compatible GUI (Arena, C
 
 ### Tests
 
-Tests use Google Test and are built separately:
+Three standalone test executables live in `tests/`. Build and run all of them with:
 
 ```bash
 make test
 ```
 
-This configures a CMake build in `build-test/`, compiles three test executables, and runs them via `ctest`. The suites are:
+The Makefile compiles each executable directly (no CMake, no external test framework) into `build-test/` and runs them in sequence:
 
-| Executable | Coverage |
-|---|---|
-| `test_perft` | Move-generation node counts (D1–D6, 778 cases) |
-| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move |
-| `test_see` | Static exchange evaluation |
+| Executable | Coverage | Cases |
+|---|---|---|
+| `test_perft` | Move-generation node counts (D1–D6) | 778 |
+| `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move | 24 |
+| `test_see` | Static exchange evaluation | 2 |
+
+The executables can also be run individually after `make test` has built them:
+
+```bash
+./build-test/test_perft
+./build-test/test_bratko_kopec
+./build-test/test_see
+```
 
 ---
 
@@ -75,7 +83,7 @@ This configures a CMake build in `build-test/`, compiles three test executables,
 
 ### Board representation
 
-`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, en-passant square, and half/full-move counters.
+`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, and a `state` field (`move_undo_t`) that carries the Zobrist hash, checker bitboard, castling rights, en-passant square, half/full-move counters, and `scores[2]` — incrementally maintained material + piece-square totals for each side.
 
 `bitboard_t` is a `typedef uint64_t` in LERF mapping: bit 0 = a1, bit 63 = h8. Direct bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`) are used throughout; the `BB_FOREACH` macro iterates set bits from LSB to MSB.
 
@@ -126,10 +134,9 @@ Move ordering: transposition-table move first, then MVV-LVA (victim value × 100
 
 ### Evaluation
 
-`evaluate_position` ([include/evaluation.h](include/evaluation.h), [src/evaluation.c](src/evaluation.c)) scores:
+Material and piece-square scores are maintained incrementally in `position_t::state.scores[2]`, updated on every `position_add/remove/move_piece` call and restored for free during move undo. `evaluate_position` ([include/evaluation.h](include/evaluation.h), [src/evaluation.c](src/evaluation.c)) reads these cached scores for a fast lazy-evaluation cutoff (±200 cp), then falls through to compute:
 
-- Material count
-- Piece-square tables (tapered between opening/middlegame and endgame phases)
+- Bishop-pair bonus
 - Pawn structure: passed, isolated, backward, doubled, and defended pawns
 - Mobility
 - King safety (pawn shelter, attacking pieces near the king)
