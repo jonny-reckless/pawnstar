@@ -364,7 +364,7 @@ int evaluate_position(const game_t *game, int alpha, int beta)
     scores[WHITE] += evaluate_king(position, WHITE, is_endgame);
     scores[BLACK] += evaluate_king(position, BLACK, is_endgame);
     score = position_color_to_move(position) == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
-    return score / 5 * 5;
+    return score;
 }
 
 int eval_piece_square_score(piece_t piece, color_t color, square_t square)

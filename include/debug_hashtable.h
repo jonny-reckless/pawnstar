@@ -30,7 +30,7 @@ void debug_x_clear(void);
 void debug_x_write(void);
 
 /// @brief Increment the counter named @p key by 1.
-static inline void debug_x_increment(const char *key)
+static inline __attribute__((always_inline)) void debug_x_increment(const char *key)
 {
     uint64_t x = (uint64_t)key;
     x >>= 2;
@@ -40,7 +40,7 @@ static inline void debug_x_increment(const char *key)
 }
 
 /// @brief Set the counter named @p key to @p val.
-static inline void debug_x_assign(const char *key, int64_t val)
+static inline __attribute__((always_inline)) void debug_x_assign(const char *key, int64_t val)
 {
     uint64_t x = (uint64_t)key;
     x >>= 2;
