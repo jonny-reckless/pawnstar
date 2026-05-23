@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -9,8 +10,6 @@
 #include "position.h"
 
 extern const char *perft_results[132];
-
-#define MAX_PERFT_DEPTH 6
 
 static uint64_t count_nodes(position_t *pos, int depth)
 {
@@ -28,8 +27,12 @@ static uint64_t count_nodes(position_t *pos, int depth)
     return n;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    int max_depth = 6;
+    if (argc >= 2)
+        max_depth = atoi(argv[1]);
+
     int failures = 0;
     int total    = 0;
 
@@ -56,7 +59,7 @@ int main(void)
         {
             int      depth;
             uint64_t expected;
-            if (sscanf(tok, " D%d %" SCNu64, &depth, &expected) == 2 && depth <= MAX_PERFT_DEPTH)
+            if (sscanf(tok, " D%d %" SCNu64, &depth, &expected) == 2 && depth <= max_depth)
             {
                 position_t pos = position_from_string(fen);
 

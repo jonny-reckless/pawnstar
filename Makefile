@@ -77,7 +77,7 @@ $(GENERATED_DATA): $(GENERATOR_EXE)
 
 # ─── Test build ──────────────────────────────────────────────────────────────
 test: prep $(LIB) $(TEST_EXES)
-	$(TEST_BUILD_DIR)/test_perft
+	$(TEST_BUILD_DIR)/test_perft 5
 	$(TEST_BUILD_DIR)/test_bratko_kopec
 	$(TEST_BUILD_DIR)/test_see
 

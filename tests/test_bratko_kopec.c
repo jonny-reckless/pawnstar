@@ -73,7 +73,7 @@ int main(void)
             move_to_string(best, got, sizeof(got));
 
         int pass = (best != move_none()) && (strcmp(got, tc->expected_move) == 0);
-        printf("\n[%s]  pos%02d  got=%-5s  expected=%-5s  %s\n", pass ? "PASS" : "FAIL", i + 1, got, tc->expected_move,
+        printf("[%s]  pos%02d  got=%-5s  expected=%-5s  %s\n\n", pass ? "PASS" : "FAIL", i + 1, got, tc->expected_move,
                tc->fen);
         fflush(stdout);
 
