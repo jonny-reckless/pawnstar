@@ -4,6 +4,7 @@
 
 #include "constants.h"
 #include "debug_hashtable.h"
+#include "evaluation.h"
 #include "generated_data.h"
 #include "pins.h"
 #include "position.h"
@@ -30,15 +31,10 @@ static const bitboard_t BB_B8_C8_D8 = (1ull << 57) | (1ull << 58) | (1ull << 59)
 /// @brief Low-level move generator. If @p do_all_moves is false, generates only captures.
 static move_list_t position_gen_moves(const position_t *pos, color_t color, bool do_all_moves);
 
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
+// The xxx_undo functions do not modify the piece square score or Zobrist hash since these are
+// retored from the move_undo_t context directly rather than recomputed.
 
-// ---------------------------------------------------------------------------
-// No-hash piece helpers (used during undo — hash is restored from undo record)
-// ---------------------------------------------------------------------------
-
-static void position_add_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t to)
+static void position_add_piece_undo(position_t *pos, color_t color, piece_t piece, square_t to)
 {
     const bitboard_t to_bb = bitboard_from_square(to);
     (&pos->pawns)[piece - PAWN] ^= to_bb;
@@ -46,7 +42,7 @@ static void position_add_piece_nohash(position_t *pos, color_t color, piece_t pi
     pos->squares[to] = piece;
 }
 
-static void position_remove_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from)
+static void position_remove_piece_undo(position_t *pos, color_t color, piece_t piece, square_t from)
 {
     const bitboard_t from_bb = bitboard_from_square(from);
     (&pos->pawns)[piece - PAWN] ^= from_bb;
@@ -54,7 +50,7 @@ static void position_remove_piece_nohash(position_t *pos, color_t color, piece_t
     pos->squares[from] = NONE;
 }
 
-static void position_move_piece_nohash(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
+static void position_move_piece_undo(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
 {
     const bitboard_t from_to_bb = bitboard_from_square(from) | bitboard_from_square(to);
     (&pos->pawns)[piece - PAWN] ^= from_to_bb;
@@ -68,8 +64,9 @@ static void position_add_piece(position_t *pos, color_t color, piece_t piece, sq
     const bitboard_t to_bb = bitboard_from_square(to);
     (&pos->pawns)[piece - PAWN] ^= to_bb;
     (&pos->white_pieces)[color] ^= to_bb;
+    pos->squares[to] = piece;
+    pos->state.scores[color] += eval_piece_square_score(piece, color, to);
     pos->state.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
-    pos->squares[to] = (uint8_t)piece;
 }
 
 static void position_remove_piece(position_t *pos, color_t color, piece_t piece, square_t from)
@@ -77,8 +74,9 @@ static void position_remove_piece(position_t *pos, color_t color, piece_t piece,
     const bitboard_t from_bb = bitboard_from_square(from);
     (&pos->pawns)[piece - PAWN] ^= from_bb;
     (&pos->white_pieces)[color] ^= from_bb;
+    pos->squares[from] = NONE;
+    pos->state.scores[color] -= eval_piece_square_score(piece, color, from);
     pos->state.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
-    pos->squares[from] = (uint8_t)NONE;
 }
 
 static void position_move_piece(position_t *pos, color_t color, piece_t piece, square_t from, square_t to)
@@ -87,9 +85,10 @@ static void position_move_piece(position_t *pos, color_t color, piece_t piece, s
     const zobrist_t *hash_row   = PIECE_SQUARE_HASHES[color][piece - 1];
     (&pos->pawns)[piece - PAWN] ^= from_to_bb;
     (&pos->white_pieces)[color] ^= from_to_bb;
+    pos->squares[from] = NONE;
+    pos->squares[to]   = piece;
+    pos->state.scores[color] += eval_piece_square_score(piece, color, to) - eval_piece_square_score(piece, color, from);
     pos->state.hash ^= hash_row[to] ^ hash_row[from];
-    pos->squares[from] = (uint8_t)NONE;
-    pos->squares[to]   = (uint8_t)piece;
 }
 
 static zobrist_t position_compute_hash(const position_t *pos)
@@ -241,49 +240,49 @@ void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo)
     {
     case MOVE_NON_CAPTURE:
     case MOVE_PAWN_DOUBLE_PUSH:
-        position_move_piece_nohash(pos, color, piece, to, from);
+        position_move_piece_undo(pos, color, piece, to, from);
         break;
 
     case MOVE_CAPTURE:
-        position_move_piece_nohash(pos, color, piece, to, from);
-        position_add_piece_nohash(pos, enemy_of(color), move_captured(move), to);
+        position_move_piece_undo(pos, color, piece, to, from);
+        position_add_piece_undo(pos, enemy_of(color), move_captured(move), to);
         break;
 
     case MOVE_PROMOTION_KNIGHT:
     case MOVE_PROMOTION_BISHOP:
     case MOVE_PROMOTION_ROOK:
     case MOVE_PROMOTION_QUEEN:
-        position_remove_piece_nohash(pos, color, move_promoted(move), to);
-        position_add_piece_nohash(pos, color, PAWN, from);
+        position_remove_piece_undo(pos, color, move_promoted(move), to);
+        position_add_piece_undo(pos, color, PAWN, from);
         if (move_captured(move) != NONE)
         {
-            position_add_piece_nohash(pos, enemy_of(color), move_captured(move), to);
+            position_add_piece_undo(pos, enemy_of(color), move_captured(move), to);
         }
         break;
 
     case MOVE_EP_CAPTURE:
-        position_move_piece_nohash(pos, color, PAWN, to, from);
-        position_add_piece_nohash(pos, enemy_of(color), PAWN, (square_t)((from & 0x38) | (to & 0x07)));
+        position_move_piece_undo(pos, color, PAWN, to, from);
+        position_add_piece_undo(pos, enemy_of(color), PAWN, (square_t)((from & 0x38) | (to & 0x07)));
         break;
 
     case MOVE_CASTLING:
         switch (to)
         {
         case 6: // G1
-            position_move_piece_nohash(pos, WHITE, KING, SQ_G1, SQ_E1);
-            position_move_piece_nohash(pos, WHITE, ROOK, SQ_F1, SQ_H1);
+            position_move_piece_undo(pos, WHITE, KING, SQ_G1, SQ_E1);
+            position_move_piece_undo(pos, WHITE, ROOK, SQ_F1, SQ_H1);
             break;
         case 2: // C1
-            position_move_piece_nohash(pos, WHITE, KING, SQ_C1, SQ_E1);
-            position_move_piece_nohash(pos, WHITE, ROOK, SQ_D1, SQ_A1);
+            position_move_piece_undo(pos, WHITE, KING, SQ_C1, SQ_E1);
+            position_move_piece_undo(pos, WHITE, ROOK, SQ_D1, SQ_A1);
             break;
         case 62: // G8
-            position_move_piece_nohash(pos, BLACK, KING, SQ_G8, SQ_E8);
-            position_move_piece_nohash(pos, BLACK, ROOK, SQ_F8, SQ_H8);
+            position_move_piece_undo(pos, BLACK, KING, SQ_G8, SQ_E8);
+            position_move_piece_undo(pos, BLACK, ROOK, SQ_F8, SQ_H8);
             break;
         case 58: // C8
-            position_move_piece_nohash(pos, BLACK, KING, SQ_C8, SQ_E8);
-            position_move_piece_nohash(pos, BLACK, ROOK, SQ_D8, SQ_A8);
+            position_move_piece_undo(pos, BLACK, KING, SQ_C8, SQ_E8);
+            position_move_piece_undo(pos, BLACK, ROOK, SQ_D8, SQ_A8);
             break;
         default:
             break;
@@ -297,9 +296,8 @@ void position_undo_move(position_t *pos, move_t move, const move_undo_t *undo)
 
 position_t position_from_string(const char *fen_string)
 {
-    position_t pos;
-    memset(&pos, 0, sizeof(pos));
-    const char *p = fen_string;
+    position_t  pos = {0};
+    const char *p   = fen_string;
 
     // piece_t placement
     int x = 0, y = 7;

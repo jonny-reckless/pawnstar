@@ -187,29 +187,19 @@ static inline pawn_structure_t determine_pawn_structure(const position_t *pos, c
     return ps;
 }
 
-static inline int evaluate_material(const position_t *pos, color_t color)
+static inline int evaluate_material_extra(const position_t *pos, color_t color)
 {
     const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
-    const bitboard_t pawns           = pos->pawns & friendly_pieces;
-    const bitboard_t knights         = pos->knights & friendly_pieces;
     const bitboard_t bishops         = pos->bishops & friendly_pieces;
-    const bitboard_t rooks           = pos->rooks & friendly_pieces;
-    const bitboard_t queens          = pos->queens & friendly_pieces;
-    // clang-format off
-    int score = popcount(pawns)   *  100 +
-                popcount(knights) *  325 +
-                popcount(bishops) *  325 +
-                popcount(rooks)   *  600 +
-                popcount(queens)  * 1000;
-    // clang-format on
+    int              score           = 0;
     if (bishops & WHITE_SQUARES && bishops & BLACK_SQUARES)
     {
-        score += 50;
+        score = 30; // Bonus for the bishop pair
     }
     return score;
 }
 
-static inline int evaluate_mobility(const position_t *pos, color_t color, const pawn_structure_t *ps)
+static inline int evaluate_mobility(const position_t *pos, color_t color, const pawn_structure_t ps[2])
 {
     const bitboard_t friendly_pieces  = position_pieces_of_color(pos, color);
     const bitboard_t occupied_squares = position_occupied_squares(pos);
@@ -232,35 +222,6 @@ static inline int evaluate_mobility(const position_t *pos, color_t color, const 
     {
         const bitboard_t attacks = rook_attacks(occupied_squares, s) & ~friendly_pieces;
         score += ROOK_ATTACK_SCORES[popcount(attacks)];
-    }
-    return score;
-}
-
-static inline int evaluate_piece_square(const position_t *pos, color_t color)
-{
-    const uint8_t    rank_flip       = (uint8_t)(color == WHITE ? RANK_FLIP : 0);
-    const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
-    int              score           = 0;
-    square_t         s;
-    BB_FOREACH(s, pos->pawns & friendly_pieces)
-    {
-        score += PAWN_SQUARE[s ^ rank_flip];
-    }
-    BB_FOREACH(s, pos->knights & friendly_pieces)
-    {
-        score += KNIGHT_SQUARE[s ^ rank_flip];
-    }
-    BB_FOREACH(s, pos->bishops & friendly_pieces)
-    {
-        score += BISHOP_SQUARE[s ^ rank_flip];
-    }
-    BB_FOREACH(s, pos->rooks & friendly_pieces)
-    {
-        score += ROOK_SQUARE[s ^ rank_flip];
-    }
-    BB_FOREACH(s, pos->queens & friendly_pieces)
-    {
-        score += QUEEN_SQUARE[s ^ rank_flip];
     }
     return score;
 }
@@ -366,18 +327,27 @@ int evaluate_position(const game_t *game, int alpha, int beta)
         return DRAW_SCORE;
     }
     int scores[2];
-    scores[WHITE] = evaluate_material(position, WHITE);
-    scores[BLACK] = evaluate_material(position, BLACK);
-    int score =
-        position_color_to_move(position) == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
-    if (score > beta + 200 || score < alpha - 200)
+    scores[WHITE] = position->state.scores[WHITE];
+    scores[BLACK] = position->state.scores[BLACK];
+    // See if the PST score is sufficient to avoid evaluation altogether.
+    int              score         = position->state.scores[WHITE] - game->position.state.scores[BLACK];
+    static const int multiplier[2] = {1, -1}; // WHITE, BLACK
+    const color_t    color         = position_color_to_move(position);
+    score *= multiplier[color];
+    if (score > beta + 200)
     {
-        INCREMENT("eval material cutoff");
+        INCREMENT("eval material cutoff beta");
+        return score;
+    }
+    if (score < alpha - 200)
+    {
+        INCREMENT("eval material cutoff alpha");
         return score;
     }
     const bool is_endgame = is_in_endgame(position);
-    scores[WHITE] += evaluate_piece_square(position, WHITE);
-    scores[BLACK] += evaluate_piece_square(position, BLACK);
+    // Add additional material terms to PST score.
+    scores[WHITE] += evaluate_material_extra(position, WHITE);
+    scores[BLACK] += evaluate_material_extra(position, BLACK);
     pawn_structure_t ps[2];
     ps[WHITE] = determine_pawn_structure(position, WHITE);
     ps[BLACK] = determine_pawn_structure(position, BLACK);
@@ -389,4 +359,26 @@ int evaluate_position(const game_t *game, int alpha, int beta)
     scores[BLACK] += evaluate_king(position, BLACK, is_endgame);
     score = position_color_to_move(position) == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
     return score / 5 * 5;
+}
+
+int eval_piece_square_score(piece_t piece, color_t color, square_t square)
+{
+    static const uint8_t flips[2]  = {RANK_FLIP, 0};
+    const uint8_t        rank_flip = flips[color];
+    switch (piece)
+    {
+    case PAWN:
+        return 100 + PAWN_SQUARE[square ^ rank_flip];
+    case KNIGHT:
+        return 300 + KNIGHT_SQUARE[square ^ rank_flip];
+    case BISHOP:
+        return 300 + BISHOP_SQUARE[square ^ rank_flip];
+    case ROOK:
+        return 500 + ROOK_SQUARE[square ^ rank_flip];
+    case QUEEN:
+        return 900 + QUEEN_SQUARE[square ^ rank_flip];
+    case KING:
+    default:
+        return 0;
+    }
 }

@@ -21,6 +21,7 @@ typedef struct
 {
     zobrist_t         hash;                  ///< Zobrist hash before the move.
     bitboard_t        checkers;              ///< Checker bitboard before the move.
+    int               scores[2];             ///< Material + piece square scores for each side.
     square_t          en_passant_square;     ///< En-passant target before the move.
     castling_rights_t castling_rights;       ///< Castling rights before the move.
     pos_flags_t       flags;                 ///< State flags before the move.
@@ -70,7 +71,7 @@ typedef struct position_t
     square_t    king_location[2]; ///< King square indexed by color_t (WHITE=0, BLACK=1).
 } position_t;
 
-static_assert(sizeof(position_t) == 160, "position_t layout changed");
+static_assert(sizeof(position_t) == 168, "position_t layout changed");
 
 // ---------------------------------------------------------------------------
 // Inline accessors (read-only)

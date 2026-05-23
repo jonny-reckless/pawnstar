@@ -4,8 +4,6 @@
 /// perft_results[] table in tests/perft_results.c. Depths above MAX_PERFT_DEPTH
 /// are skipped.
 
-#define DEBUGX 0
-
 extern "C"
 {
 #include "move.h"
@@ -101,18 +99,14 @@ TEST_P(PerftTest, NodeCount)
     double elapsed_s = std::chrono::duration<double>(t1 - t0).count();
     double nps       = elapsed_s > 0.0 ? nodes / elapsed_s : 0.0;
 
-    std::printf("  %-72s  D%d  %12" PRIu64 "  %7.3fs  %10.0f nps\n",
-                tc.fen.c_str(), tc.depth, nodes, elapsed_s, nps);
+    std::printf("  %-72s  D%d  %12" PRIu64 "  %7.3fs  %10.0f nps\n", tc.fen.c_str(), tc.depth, nodes, elapsed_s, nps);
     std::fflush(stdout);
 
     EXPECT_EQ(nodes, tc.expected) << "FEN: " << tc.fen << "  depth: " << tc.depth;
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    Standard,
-    PerftTest,
-    testing::ValuesIn(build_cases()),
-    [](const testing::TestParamInfo<PerftCase> &info)
-    {
-        return "pos" + std::to_string(info.param.pos_idx) + "_D" + std::to_string(info.param.depth);
-    });
+INSTANTIATE_TEST_SUITE_P(Standard, PerftTest, testing::ValuesIn(build_cases()),
+                         [](const testing::TestParamInfo<PerftCase> &info) {
+                             return "pos" + std::to_string(info.param.pos_idx) + "_D" +
+                                    std::to_string(info.param.depth);
+                         });

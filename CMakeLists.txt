@@ -66,7 +66,7 @@ function(add_engine_test name)
     target_link_libraries(${name} PRIVATE engine gtest_main)
     target_compile_options(${name} PRIVATE -mbmi2)
     target_compile_definitions(${name} PRIVATE
-        DEBUGX=0
+        DEBUGX=1
         _POSIX_C_SOURCE=200809L
         NDEBUG
     )
