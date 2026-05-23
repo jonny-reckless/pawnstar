@@ -50,7 +50,7 @@ Pawnstar is a UCI chess engine written in **C17** using bitboard board represent
 
 **Naming conventions** — types are `lower_snake_case_t`, functions are `type_verb` or `type_verb_noun` (e.g. `position_make_move`, `move_list_push_back`), constants and macros are `UPPER_SNAKE_CASE`. One logical module per `.h`/`.c` pair; inline functions live in the header.
 
-**Board representation** — `position_t` ([include/position.h](include/position.h)) holds six per-piece bitboards, two per-color bitboards, a `squares[64]` array for O(1) piece lookup, Zobrist hash, castling rights, and en-passant square. `bitboard_t` is a `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8). The `BB_FOREACH` macro iterates set bits LSB-first.
+**Board representation** — `position_t` ([include/position.h](include/position.h)) holds six per-piece bitboards, two per-color bitboards, a `squares[64]` array for O(1) piece lookup, and a `state` field (`move_undo_t`) that carries the Zobrist hash, checker bitboard, castling rights, en-passant square, half/full-move counters, and `scores[2]` (incremental material + piece-square totals for each side). `bitboard_t` is a `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8). The `BB_FOREACH` macro iterates set bits LSB-first.
 
 **Move encoding** — `move_t` is a `typedef int64_t` packing from/to squares (bits 0–11), moving piece (12–14), captured piece (15–17), move type flags (18–21), gives-check flag (22), and sort score (32–63). `move_list_t` and `variation_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
 
@@ -60,7 +60,7 @@ Pawnstar is a UCI chess engine written in **C17** using bitboard board represent
 
 The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)) uses iterative deepening from depth 3, PVS (principal variation search), null-move pruning, late-move reduction (LMR after the 3rd move at depth > 2 in non-PV nodes), and check/promotion/en-passant extensions. Move ordering: TT move first, then MVV-LVA combined with the history heuristic.
 
-**Evaluation** — `evaluate_position` ([src/evaluation.c](src/evaluation.c)) scores material, piece-square tables (tapered between opening and endgame phases), pawn structure (passed, isolated, backward, doubled, defended), mobility, and king safety (pawn shelter, attacking pieces near the king).
+**Evaluation** — Material and piece-square scores are maintained incrementally in `position_t::state.scores[2]`. `position_add_piece`, `position_remove_piece`, and `position_move_piece` update `scores` via `eval_piece_square_score` ([include/evaluation.h](include/evaluation.h)); undo restores them directly from the saved `move_undo_t`. `evaluate_position` ([src/evaluation.c](src/evaluation.c)) reads `scores` for an early lazy-evaluation cutoff (±200 cp window), then adds the bishop-pair bonus, pawn structure (passed, isolated, backward, doubled, defended), mobility, and king safety (pawn shelter, attacking pieces near the king) on the slow path.
 
 **Opening book** — loaded from a plain-text file; positions are sorted by Zobrist hash at load time; runtime lookup is O(log n) via `bsearch`. Move selection uses a xorshift64 PRNG.
 
