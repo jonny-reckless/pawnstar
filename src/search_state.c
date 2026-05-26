@@ -22,7 +22,7 @@ search_state_t *search_state_from_game(game_t *game)
     return ss;
 }
 
-search_state_t *search_state_worker(const search_state_t *parent, atomic_bool *cutoff)
+search_state_t *search_state_new(const search_state_t *parent, atomic_bool *cutoff)
 {
     search_state_t *ss = slice_allocator_alloc(&parent->game->ss_pool);
     ss->hash_len       = parent->hash_len;

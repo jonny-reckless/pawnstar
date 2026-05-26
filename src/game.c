@@ -93,7 +93,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
     {
         move_t *m     = &moves->items[i];
         int     score = PIECE_VALUES[(int)move_captured(*m)] * 10000 - PIECE_VALUES[(int)move_piece(*m)] * 1000 +
-                    (int)history_table_get_count(&self->history_table, ply, *m);
+                        (int)history_table_get_count(&self->history_table, ply, *m);
         move_assign_score(m, score);
     }
     move_list_sort(moves);

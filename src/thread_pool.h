@@ -22,7 +22,6 @@ typedef struct
     int             alpha;        ///< Alpha at the time of dispatch (parent's current alpha).
     int             beta;         ///< Beta at the time of dispatch (parent's beta).
     int             result_score; ///< Written by the pool thread before signalling done.
-    atomic_bool    *was_cutoff;   ///< Per-batch flag; the thread stores true when score ≥ beta.
 } pool_work_t;
 
 /// @brief Function executed by a pool thread to process one work item.

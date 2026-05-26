@@ -118,7 +118,7 @@ static int search_work_fn(pool_work_t *work)
         if (score >= work->beta)
         {
             INCREMENT("parallel cutoffs");
-            atomic_store(work->was_cutoff, true);
+            atomic_store(work->ss->was_cutoff, true);
         }
     }
     search_state_free(work->ss);
@@ -139,10 +139,13 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     atomic_init(&cutoff, false);
 
     thread_pool_t *pool = &ss->game->thread_pool;
-    int            dispatched[MAX_MOVES_PER_POSITION];
-    move_t         dispatched_moves[MAX_MOVES_PER_POSITION];
-    int            n_dispatched = 0;
-    int            serial_from  = n_moves; // first index not dispatched; searched serially below
+    struct dispatched
+    {
+        move_t move;
+        int    slot;
+    } dispatched_moves[MAX_MOVES_PER_POSITION];
+    int n_dispatched = 0;
+    int serial_from  = n_moves; // first index not dispatched; searched serially below
 
     for (int i = 0; i < n_moves; ++i)
     {
@@ -160,33 +163,18 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
             serial_from = i; // pool exhausted; fall back to serial from here
             break;
         }
-        pool_work_t work = {search_state_worker(ss, &cutoff), moves[i], depth, ply, alpha, beta, ALPHA, &cutoff};
+        search_state_t *child_ss = search_state_new(ss, &cutoff); // freed in search_work_fn
+        pool_work_t     work     = {child_ss, moves[i], depth, ply, alpha, beta, ALPHA};
         thread_pool_dispatch(pool, slot, work, search_work_fn);
-        dispatched[n_dispatched]       = slot;
-        dispatched_moves[n_dispatched] = moves[i];
+
+        dispatched_moves[n_dispatched].slot = slot;
+        dispatched_moves[n_dispatched].move = moves[i];
         INCREMENT("parallel moves searched");
         ++n_dispatched;
     }
 
-    // Collect all parallel results before the serial phase so workers don't race with ss.
-    move_t best       = move_none();
+    move_t best_move  = move_none();
     int    best_score = ALPHA;
-    for (int i = 0; i < n_dispatched; ++i)
-    {
-        int score = thread_pool_collect(pool, dispatched[i]);
-        thread_pool_release(pool, dispatched[i]);
-        if (score > best_score)
-        {
-            best_score = score;
-            best       = move_with_score(dispatched_moves[i], best_score);
-        }
-    }
-
-    if (best_score >= beta)
-    {
-        INCREMENT("parallel search beta cutoffs");
-        return best;
-    }
 
     // Search any moves that couldn't be dispatched (pool was exhausted).
     for (int i = serial_from; i < n_moves; ++i)
@@ -195,26 +183,43 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
         {
             continue;
         }
-        if (ss_is_cancelled(ss) || best_score >= beta)
+
+        INCREMENT("parallel fallback serial");
+        variation_t dummy;
+        variation_clear(&dummy);
+        int score = search_single_move(ss, depth, ply, alpha, beta, moves[i], &dummy, i);
+        if (ss_is_cancelled(ss))
         {
             break;
         }
-        INCREMENT("parallel fallback serial");
-        variation_t pv;
-        variation_clear(&pv);
-        int score = search_single_move(ss, depth, ply, alpha, beta, moves[i], &pv, i);
         if (score > best_score)
         {
             best_score = score;
-            best       = move_with_score(moves[i], best_score);
+            best_move  = move_with_score(moves[i], best_score);
         }
         if (score >= beta)
         {
             INCREMENT("parallel search fallback beta cutoffs");
-            return best;
+            atomic_store(&cutoff, true);
+            break;
         }
     }
-    return best;
+
+    for (int i = 0; i < n_dispatched; ++i)
+    {
+        int score = thread_pool_collect(pool, dispatched_moves[i].slot);
+        thread_pool_release(pool, dispatched_moves[i].slot);
+        if (score > best_score)
+        {
+            best_score = score;
+            best_move  = move_with_score(dispatched_moves[i].move, best_score);
+        }
+        if (best_score >= beta)
+        {
+            INCREMENT("parallel search beta cutoffs");
+        }
+    }
+    return best_move;
 }
 
 // ---------------------------------------------------------------------------

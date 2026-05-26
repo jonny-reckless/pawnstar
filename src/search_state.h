@@ -50,7 +50,7 @@ search_state_t *search_state_from_game(game_t *game);
 /// pos_stack is seeded with the parent's current position (1 entry, 160 bytes).
 /// hash_stack is copied from the parent (compact: 16 bytes × n entries).
 /// game is shared via pointer.
-search_state_t *search_state_worker(const search_state_t *parent, atomic_bool *cutoff);
+search_state_t *search_state_new(const search_state_t *parent, atomic_bool *cutoff);
 
 /// @brief Free a heap-allocated search_state.
 void search_state_free(search_state_t *ss);
