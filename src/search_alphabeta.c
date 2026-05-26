@@ -12,6 +12,10 @@
 #include "search_state.h"
 #include "transposition_table.h"
 
+#ifndef DO_PARALLEL_SEARCH
+#define DO_PARALLEL_SEARCH 1
+#endif
+
 // ---------------------------------------------------------------------------
 // Single-move search
 // ---------------------------------------------------------------------------
@@ -99,6 +103,7 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 // ---------------------------------------------------------------------------
 // Young Brothers Wait parallel search
 // ---------------------------------------------------------------------------
+#if DO_PARALLEL_SEARCH
 
 /// @brief Pool work function: execute one parallel move search and signal a cutoff if found.
 /// Checks for cancellation before searching. Frees the worker search_state_t on completion.
@@ -221,6 +226,8 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     }
     return best_move;
 }
+
+#endif
 
 // ---------------------------------------------------------------------------
 // Main alpha-beta search
@@ -417,9 +424,11 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
             }
         }
 
+#if DO_PARALLEL_SEARCH
+
         // After searching 2 serial moves at a null-window node without a cutoff, assume this is an
         // all-node and dispatch remaining moves in parallel (Young Brothers Wait).
-        if (i > 1 && beta == alpha + 1 && !ss_is_cancelled(ss) && ss_can_go_parallel(ss, depth) &&
+        if (i > 0 && beta == alpha + 1 && !ss_is_cancelled(ss) && ss_can_go_parallel(ss, depth) &&
             (i + 1) < move_list.size)
         {
             move_t skip       = has_transposition ? transposition.move : move_none();
@@ -445,8 +454,9 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
             }
             break; // parallel phase handled the rest
         }
-    }
 
+#endif
+    }
     if (has_raised_alpha)
     {
         INCREMENT("pv nodes");

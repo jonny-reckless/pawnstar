@@ -110,5 +110,5 @@ static inline bool ss_can_go_parallel(const search_state_t *ss, int depth)
 {
     int val;
     sem_getvalue(&ss->game->thread_pool.available, &val);
-    return ss->was_cutoff == NULL && depth >= 4 && val > 0;
+    return depth >= 4 && val > 0;
 }

@@ -36,12 +36,12 @@ void game_init(game_t *self)
     history_table_init(&self->history_table);
     opening_book_init(&self->book);
     self->worker_running = false;
-    int nprocs           = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (nprocs < 1)
+    int num_cpus         = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (num_cpus < 1)
     {
-        nprocs = 1;
+        num_cpus = 1;
     }
-    thread_pool_init(&self->thread_pool, nprocs);
+    thread_pool_init(&self->thread_pool, num_cpus);
     slice_allocator_init(&self->ss_pool, sizeof(search_state_t), NUM_ALLOCATOR_SLICES);
     game_new_game_default(self);
 }
@@ -92,7 +92,7 @@ void game_score_and_sort_moves(game_t *self, move_list_t *moves, int ply)
     for (int i = 0; i < moves->size; ++i)
     {
         move_t *m     = &moves->items[i];
-        int     score = PIECE_VALUES[(int)move_captured(*m)] * 10000 - PIECE_VALUES[(int)move_piece(*m)] * 1000 +
+        int     score = PIECE_VALUES[(int)move_captured(*m)] * 1000 - PIECE_VALUES[(int)move_piece(*m)] * 100 +
                         (int)history_table_get_count(&self->history_table, ply, *m);
         move_assign_score(m, score);
     }
