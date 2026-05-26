@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "debug_hashtable.h"
 #include "game.h"
@@ -34,6 +35,9 @@ void game_init(game_t *self)
     history_table_init(&self->history_table);
     opening_book_init(&self->book);
     self->worker_running = false;
+    int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs < 1) nprocs = 1;
+    sem_init(&self->parallel_slots, 0, (unsigned)nprocs);
     game_new_game_default(self);
 }
 
@@ -43,15 +47,16 @@ void game_free(game_t *self)
     transposition_table_free(&self->transposition_table);
     history_table_free(&self->history_table);
     opening_book_free(&self->book);
+    sem_destroy(&self->parallel_slots);
 }
 
 void game_new_game(game_t *self, const char *fen_string)
 {
     chess_clock_init(&self->time_control);
-    self->node_count        = 0;
-    self->is_cancel_pending = false;
-    self->position          = &self->positions[0];
-    self->positions[0]      = position_from_string(fen_string);
+    self->node_count   = 0;
+    atomic_store(&self->is_cancel_pending, false);
+    self->position     = &self->positions[0];
+    self->positions[0] = position_from_string(fen_string);
 }
 
 void game_new_game_default(game_t *self)
@@ -180,7 +185,7 @@ static void search_worker(game_t *game)
 
 void game_stop_thinking(game_t *self)
 {
-    self->is_cancel_pending = true;
+    atomic_store(&self->is_cancel_pending, true);
     if (self->worker_running)
     {
         thrd_join(self->worker_thread, NULL);
@@ -191,8 +196,8 @@ void game_stop_thinking(game_t *self)
 void game_start_thinking(game_t *self)
 {
     game_stop_thinking(self);
-    self->is_cancel_pending = false;
-    self->worker_running    = true;
+    atomic_store(&self->is_cancel_pending, false);
+    self->worker_running = true;
     if (thrd_create(&self->worker_thread, search_thread_entry, self) != thrd_success)
     {
         self->worker_running = false;

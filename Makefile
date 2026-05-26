@@ -28,6 +28,7 @@ LIB_SOURCES = \
 	search_alphabeta.c \
 	search_quiescent.c \
 	search_root_node.c \
+	search_state.c \
 	static_exchange_evaluation.c \
 	transposition_table.c \
 	$(notdir $(GENERATED_DATA))

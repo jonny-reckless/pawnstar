@@ -40,7 +40,7 @@ static void handle_eval(game_t *game, char **args, int argc)
 {
     (void)args;
     (void)argc;
-    printf("evaluation %d\n", evaluate_position(game, ALPHA, BETA));
+    printf("evaluation %d\n", evaluate_position(game->position, ALPHA, BETA));
     fflush(stdout);
 }
 

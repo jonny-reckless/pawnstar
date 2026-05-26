@@ -2,7 +2,6 @@
 #include "attacks.h"
 #include "constants.h"
 #include "debug_hashtable.h"
-#include "game.h"
 #include "generated_data.h"
 #include "position.h"
 #include "square.h"
@@ -326,10 +325,9 @@ static inline int evaluate_king(const position_t *pos, color_t color, bool is_en
     return piece_square_score + safety_score;
 }
 
-int evaluate_position(const game_t *game, int alpha, int beta)
+int evaluate_position(const position_t *position, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    const position_t *position = game->position;
     if (position_is_draw_by_material(position))
     {
         return DRAW_SCORE;

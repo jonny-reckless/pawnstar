@@ -169,7 +169,13 @@ static inline __attribute__((always_inline)) int move_from_to(move_t m)
 /// @brief Set the move-ordering score; bits 0–31 (the move fields) are unchanged.
 static inline __attribute__((always_inline)) void move_assign_score(move_t *m, int score)
 {
-    *m = (*m & 0xFFFFFFFF) | ((int64_t)score << 32);
+    *m = (*m & 0xFFFFFFFF) | (int64_t)((uint64_t)(uint32_t)score << 32);
+}
+
+/// @brief Return a copy of @p m with the move-ordering score set to @p score.
+static inline __attribute__((always_inline)) move_t move_with_score(move_t m, int score)
+{
+    return (m & 0xFFFFFFFF) | (int64_t)((uint64_t)(uint32_t)score << 32);
 }
 
 /// @brief Mark @p m as giving check (sets bit 22).

@@ -4,6 +4,7 @@
 /// the known best move (established by running to depth 12 as a reference).
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "chess_clock.h"
@@ -50,8 +51,14 @@ static const bk_case_t CASES[] = {
 
 static const int NUM_CASES = (int)(sizeof(CASES) / sizeof(CASES[0]));
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    int max_depth = 0; // 0 means use each case's own depth
+    if (argc >= 2)
+    {
+        max_depth = atoi(argv[1]);
+    }
+
     int failures = 0;
 
     for (int i = 0; i < NUM_CASES; ++i)
@@ -62,7 +69,7 @@ int main(void)
         game_init(&game);
         game_new_game(&game, tc->fen);
         game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-        game.time_control.depth      = tc->depth;
+        game.time_control.depth      = (max_depth > 0 && max_depth < tc->depth) ? max_depth : tc->depth;
 
         debug_x_clear();
         move_t best = search_root_node(&game);

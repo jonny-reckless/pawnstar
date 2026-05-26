@@ -8,41 +8,34 @@ Requires `clang` and GNU `make`. The build has a pre-compilation step that gener
 
 ```bash
 make           # release build → build/pawnstar
-make DEBUG=1   # debug build with ASan + UBSan (-Og)
-make clean     # remove build artifacts
+make DEBUG=1   # debug build with ASan + UBSan (-O0)
+make clean     # remove all build artifacts (including build-test/)
 ```
 
 Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c17`, `-I include`, and `-D _POSIX_C_SOURCE=200809L`. Debug builds add `-fsanitize=undefined,address`.
 
 ## Running Tests
 
-Tests use Google Test. Build and run with:
-
 ```bash
-make test      # configure, build, and run all three test suites
+make check     # build and run all three test suites (perft at D5)
+make test      # build test binaries only, do not run
 ```
 
-Or build once and run individually:
+Run individually after `make test`:
 
 ```bash
-cmake -S . -B build-test
-cmake --build build-test --parallel
-./build-test/test_perft          # 778 perft node-count cases (D1–D6)
+./build-test/test_perft          # 649 perft node-count cases (D1–D5 by default)
+./build-test/test_perft 4        # limit to D4
 ./build-test/test_bratko_kopec   # 24 Bratko-Kopec search positions
+./build-test/test_bratko_kopec 7 # limit to depth 7
 ./build-test/test_see            # static exchange evaluation
 ```
+
+Tests are compiled directly by the Makefile (no CMake) into `build-test/`, and linked against `build/libpawnstar.a`. The `DEBUG=1` flag applies uniformly to both the library and the test executables.
 
 ## Code Formatting
 
 clang-format with Microsoft base style, 120-column limit. Config is in `.clang-format`.
-
-## Documentation
-
-```bash
-doxygen .      # generates HTML docs; Doxyfile is in the repo root
-```
-
-All public types and functions have Doxygen comments (`/// @brief`, `///<`).
 
 ## Architecture
 
@@ -50,20 +43,28 @@ Pawnstar is a UCI chess engine written in **C17** using bitboard board represent
 
 **Naming conventions** — types are `lower_snake_case_t`, functions are `type_verb` or `type_verb_noun` (e.g. `position_make_move`, `move_list_push_back`), constants and macros are `UPPER_SNAKE_CASE`. One logical module per `.h`/`.c` pair; inline functions live in the header.
 
-**Board representation** — `position_t` ([include/position.h](include/position.h)) holds six per-piece bitboards, two per-color bitboards, a `squares[64]` array for O(1) piece lookup, and a `state` field (`move_undo_t`) that carries the Zobrist hash, checker bitboard, castling rights, en-passant square, half/full-move counters, and `scores[2]` (incremental material + piece-square totals for each side). `bitboard_t` is a `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8). The `BB_FOREACH` macro iterates set bits LSB-first.
+**Board representation** — `position_t` ([include/position.h](include/position.h)) is a fully self-contained, 160-byte struct. It holds six per-piece bitboards, two per-color bitboards, `squares[64]` for O(1) piece lookup, `scores[2]` (incremental material + piece-square totals), Zobrist `hash`, `checkers` bitboard, `castling_rights`, `en_passant_square`, `half_move_clock`, and `move_counter` — all as direct flat fields (no nested state struct). Fields are ordered largest-alignment-first to eliminate padding; the first 64 bytes match `see_board_t` for the SEE `memcpy`. `bitboard_t` is `typedef uint64_t` in LERF mapping (bit 0 = a1, bit 63 = h8).
+
+**Copy-make move** — `position_make_move(dst, src, move)` copies `src` into `dst` and applies the move. Undo is a free pointer decrement. `game_t` owns a `position_t positions[256]` stack and a `position_t *position` pointer to the top. `game_play_move` / `game_undo_move` / `game_make_null_move` increment/decrement this pointer. During search, `search_state_t` maintains its own copy-make `pos_stack` and a separate compact `hash_stack` for repetition detection.
 
 **Move encoding** — `move_t` is a `typedef int64_t` packing from/to squares (bits 0–11), moving piece (12–14), captured piece (15–17), move type flags (18–21), gives-check flag (22), and sort score (32–63). `move_list_t` and `variation_t` are fixed-capacity stack-allocated arrays — no heap allocation during search.
 
-**Attack generation** — `bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks. The lookup tables live in `src/generated_data.c`. `Pins` ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation.
+**Attack generation** — `bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks. The lookup tables live in `src/generated_data.c`. `pins_t` ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation.
 
-**Search** — `game_t` ([include/game.h](include/game.h)) owns all search state: a transposition table (64 MB), a history heuristic table, opening book, chess clock, and position history stack for repetition detection. Search runs on a `thrd_t` worker thread so UCI `stop` can interrupt it.
+**Search** — `game_t` ([include/game.h](include/game.h)) owns all shared search infrastructure: transposition table (64 MB), history heuristic table, opening book, chess clock, position stack, cancel flag (`atomic_bool is_cancel_pending`), and a POSIX semaphore (`sem_t parallel_slots`, capacity = NumCPU) controlling parallel workers. Search runs on a background `thrd_t` so UCI `stop` can interrupt it.
 
-The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)) uses iterative deepening from depth 3, PVS (principal variation search), null-move pruning, late-move reduction (LMR after the 3rd move at depth > 2 in non-PV nodes), and check/promotion/en-passant extensions. Move ordering: TT move first, then MVV-LVA combined with the history heuristic.
+`search_state_t` ([include/search_state.h](include/search_state.h)) is per-thread search state: a copy-make `pos_stack` (seeded with the position at the fork point), a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions), a `node_count`, and a pointer to the shared `game_t`. The main search owns one; each YBW worker owns its own, heap-allocated and freed by the worker on completion.
 
-**Evaluation** — Material and piece-square scores are maintained incrementally in `position_t::state.scores[2]`. `position_add_piece`, `position_remove_piece`, and `position_move_piece` update `scores` via `eval_piece_square_score` ([include/evaluation.h](include/evaluation.h)); undo restores them directly from the saved `move_undo_t`. `evaluate_position` ([src/evaluation.c](src/evaluation.c)) reads `scores` for an early lazy-evaluation cutoff (±200 cp window), then adds the bishop-pair bonus, pawn structure (passed, isolated, backward, doubled, defended), mobility, and king safety (pawn shelter, attacking pieces near the king) on the slow path.
+The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)) uses iterative deepening from depth 3, PVS (principal variation search), null-move pruning (R=4, guarded by: not a null-move position, not in check, null window, >3 non-king pieces, PST score ≥ beta+100), late-move reduction (LMR: −1 ply from move index >3 when depth>2, null-window, non-capture, non-pawn; −2 from move index >6; −3 from move index >6 with zero history count), and check/promotion extensions. Move ordering: TT move first, then MVV-LVA combined with history heuristic.
 
-**Opening book** — loaded from a plain-text file; positions are sorted by Zobrist hash at load time; runtime lookup is O(log n) via `bsearch`. Move selection uses a xorshift64 PRNG.
+**Young Brothers Wait (YBW)** — After searching 2 moves serially at a null-window node with depth ≥ 4 and available semaphore slots, remaining moves are dispatched to parallel worker threads. Each worker acquires a semaphore slot via `sem_trywait` (non-blocking; stops if none available), forks a `search_state_t` from the parent, and signals `atomic_bool cutoff` if it finds a beta cutoff. Workers free their own `search_state_t` and `sem_post` before exiting. Only the main (serial) search can spawn workers — workers never sub-spawn.
 
-**Generated data** — [generate_constants/](generate_constants/) is a standalone C program that writes [src/generated_data.c](src/generated_data.c). Its output is committed; regenerate only when attack-mask logic changes (`make gen` builds the generator).
+**Evaluation** — Incremental material + PST scores are kept in `position_t::scores[WHITE]` and `position_t::scores[BLACK]`, updated by `position_add/remove/move_piece`. `evaluate_position` ([src/evaluation.c](src/evaluation.c)) reads these for a lazy-evaluation cutoff (±200 cp), then computes bishop-pair bonus, pawn structure (passed, isolated, backward, doubled, defended), mobility, and king safety.
 
-**UCI diagnostics** — beyond the standard UCI command set, the engine accepts `eval`, `getboard`, `bookmoves`, `freebook`, `dbg`, `dbgclear`, and `help`. See [src/input_handling.c](src/input_handling.c).
+**Static exchange evaluation** — `evaluate_static_exchange` ([src/static_exchange_evaluation.c](src/static_exchange_evaluation.c)) makes the move into a `position_t` on the stack, then `memcpy`s the first 64 bytes into a `see_board_t` (pawns through black_pieces). The swap-off loop uses the cheapest available attacker at each step.
+
+**Opening book** — loaded from a plain-text file; move selection uses a xorshift64 PRNG.
+
+**Generated data** — [generate_constants/](generate_constants/) is a standalone C program that writes [src/generated_data.c](src/generated_data.c). Output is committed; regenerate only when attack-mask logic changes (`make gen`).
+
+**UCI diagnostics** — beyond standard UCI, the engine accepts `eval`, `getboard`, `bookmoves`, `freebook`, `dbg`, `dbgclear`, and `help`. See [src/input_handling.c](src/input_handling.c).

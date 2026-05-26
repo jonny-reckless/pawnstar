@@ -1,6 +1,8 @@
 #pragma once
 /// @file game_t: top-level game state owning all search infrastructure.
 
+#include <semaphore.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <threads.h>
 
@@ -21,9 +23,10 @@ typedef struct game
     chess_clock_t         time_control;                   ///< Clock and time-control parameters.
     opening_book_t        book;                           ///< Opening book.
     int                   node_count;                     ///< Nodes visited during the current search.
-    bool                  is_cancel_pending;              ///< Set by the UCI stop command; causes search to terminate.
+    atomic_bool           is_cancel_pending;              ///< Set by the UCI stop command; causes search to terminate.
     thrd_t                worker_thread;                  ///< Background thread running the search.
     bool                  worker_running;                 ///< True while worker_thread is alive and joinable.
+    sem_t                 parallel_slots;                 ///< Semaphore controlling max parallel workers (capacity = NumCPU).
     position_t            positions[POSITION_STACK_SIZE]; ///< Position history stack (copy-make).
     position_t           *position;                       ///< Pointer to the current position (top of stack).
 } game_t;

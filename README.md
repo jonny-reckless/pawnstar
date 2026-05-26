@@ -65,16 +65,17 @@ make check
 
 | Executable | Coverage | Cases |
 |---|---|---|
-| `test_perft` | Move-generation node counts (D1–D6) | 778 |
+| `test_perft` | Move-generation node counts (D1–D5) | 649 |
 | `test_bratko_kopec` | Bratko-Kopec search positions — verifies best move | 24 |
 | `test_see` | Static exchange evaluation | 2 |
 
 The executables can also be run individually after `make test` has built them:
 
 ```bash
-./build-test/test_perft          # all depths up to D5
+./build-test/test_perft          # all depths up to D5 (649 cases)
 ./build-test/test_perft 4        # limit to D4
-./build-test/test_bratko_kopec
+./build-test/test_bratko_kopec   # full depth per case
+./build-test/test_bratko_kopec 7 # limit to depth 7
 ./build-test/test_see
 ```
 
@@ -114,26 +115,31 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 ### Search
 
-`game_t` ([include/game.h](include/game.h)) owns all search state:
+`game_t` ([include/game.h](include/game.h)) owns all shared search infrastructure:
 
-- A single transposition table (64 MB)
-- A history heuristic table indexed by `(ply, from+to)`
-- An opening book of moves indexed by Zobrist hash
-- A chess clock
-- A position history stack for repetition detection
+- Transposition table (64 MB, direct-mapped, 24-byte entries)
+- History heuristic table: `uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`
+- Opening book indexed by Zobrist hash
+- Chess clock and time-control parameters
+- Position history stack (`position_t positions[256]`) for draw detection
+- `atomic_bool is_cancel_pending` — set by UCI `stop`; all search threads poll this
+- `sem_t parallel_slots` — POSIX semaphore, capacity = NumCPU, controls parallel worker count
 
-Search runs on a background `thrd_t` worker thread so the UCI `stop` command can interrupt it immediately.
+Search runs on a background `thrd_t` so the UCI `stop` command can interrupt it.
 
-The search stack ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)):
+`search_state_t` ([include/search_state.h](include/search_state.h)) is per-thread state: a copy-make position stack seeded at the fork point, a compact hash stack for repetition detection (16-byte `{hash, half_move_clock}` entries — cheap to copy when forking workers), a node counter, and a pointer to the shared `game_t`.
 
-- Iterative deepening from depth 3
-- Alpha-beta with PVS (principal variation search)
-- Null-move pruning
-- Late-move reduction (LMR): reduces depth for moves after the 3rd at depth > 2 in non-PV nodes
-- Check, promotion, and en-passant extensions
-- Quiescence search on captures only
+The search ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)):
 
-Move ordering: transposition-table move first, then MVV-LVA (victim value × 10000 − attacker value × 1000) combined with the history heuristic count.
+- Iterative deepening from depth 3, with a shallow full-width pass for initial move ordering
+- Alpha-beta with PVS (principal variation search): re-search at full window only when a null-window scout raises alpha
+- Null-move pruning: R=4, guarded by piece count (>3 non-king pieces), not-in-check, null-window, and a PST-score advantage ≥ beta+100
+- Late-move reduction (LMR) at null-window nodes, depth > 2, non-capture, non-pawn moves: −1 ply from move 5 onward; an additional −1 from move 8; a further −1 if the move has zero history count. Failed reductions are re-searched at full depth.
+- Check extensions (+1 ply when the side to move is in check) and promotion extensions (+1 ply on promotion moves)
+- Quiescence search on captures only; positions in check fall back to full alpha-beta
+- **Young Brothers Wait (YBW) parallel search**: after 2 serial moves at a null-window node with depth ≥ 4, remaining moves are dispatched to parallel worker threads. Each worker acquires a semaphore slot via `sem_trywait` (non-blocking), forks a `search_state_t`, and signals a shared `atomic_bool cutoff` on a beta cutoff. Workers never spawn sub-workers.
+
+Move ordering: transposition-table move first (searched serially before the move list is generated), then MVV-LVA (victim value × 10000 − attacker value × 1000) combined with the history heuristic count.
 
 ### Evaluation
 
