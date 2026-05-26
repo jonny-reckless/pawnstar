@@ -122,6 +122,11 @@ static const bitboard_t FILE_BITBOARDS[8] = {
     0x1010101010101010ull, 0x2020202020202020ull, 0x4040404040404040ull, 0x8080808080808080ull,
 };
 
+/// @brief Classify all friendly pawns into structural categories for @p color.
+/// Uses precomputed PASSED_PAWN_MASK, ISOLATED_PAWN_MASK, SUPPORTED_PAWN_MASK, and
+/// DOUBLED_PAWN_MASK bitboard arrays indexed by square.  Backward-pawn detection checks whether
+/// the next square ahead is attacked by an enemy pawn and the pawn has no support.
+/// Passed pawns that are also doubled are excluded from the passed-pawn bonus.
 static inline pawn_structure_t determine_pawn_structure(const position_t *pos, color_t color)
 {
     const bitboard_t friendly_pawns = pos->pawns & position_pieces_of_color(pos, color);
@@ -194,6 +199,8 @@ static inline pawn_structure_t determine_pawn_structure(const position_t *pos, c
     return ps;
 }
 
+/// @brief Additional material terms not captured by the incremental PST score.
+/// Currently: bishop-pair bonus (+30 cp when the side has bishops on both colors).
 static inline int evaluate_material_extra(const position_t *pos, color_t color)
 {
     const bitboard_t friendly_pieces = position_pieces_of_color(pos, color);
@@ -206,6 +213,10 @@ static inline int evaluate_material_extra(const position_t *pos, color_t color)
     return score;
 }
 
+/// @brief Score sliding-piece mobility for @p color.
+/// Bishop attacks that land on squares defended by enemy pawns are excluded (those squares are
+/// effectively closed).  Attack counts are clamped by the table sizes (14 for bishops, 15 for
+/// rooks); the tables award negative scores for low mobility and positive for high mobility.
 static inline int evaluate_mobility(const position_t *pos, color_t color, const pawn_structure_t ps[2])
 {
     const bitboard_t friendly_pieces  = position_pieces_of_color(pos, color);
@@ -233,6 +244,10 @@ static inline int evaluate_mobility(const position_t *pos, color_t color, const 
     return score;
 }
 
+/// @brief Aggregate the pawn-structure score for @p color.
+/// Passed pawn bonus uses PASSED_PAWN_SQUARE indexed by the (rank-flipped) pawn square so that
+/// more advanced passed pawns score higher.  Defended +5, backward −10, doubled −10,
+/// isolated −20 (all per pawn).
 static inline int evaluate_pawn_structure(const pawn_structure_t *ps, color_t color)
 {
     const uint8_t rank_flip = color == WHITE ? RANK_FLIP : 0;
@@ -249,6 +264,12 @@ static inline int evaluate_pawn_structure(const pawn_structure_t *ps, color_t co
     return score;
 }
 
+/// @brief Score the king position and safety for @p color.
+/// In the middlegame: pawn-shelter check three ranks deep (±15/10/5 cp per pawn), open-file
+/// penalty on the king file (−15 cp) and adjacent files (−10 cp each), plus the midgame PST.
+/// Adjacent friendly non-pawn pieces award +10 cp (ring-1) and +5 cp (ring-2) for piece
+/// coordination near the king.  In the endgame the PST switches to KING_SQUARE_ENDGAME
+/// (centralisation bonus) and no pawn-shelter terms are applied.
 static inline int evaluate_king(const position_t *pos, color_t color, bool is_endgame)
 {
     const uint8_t    rank_flip       = color == WHITE ? RANK_FLIP : 0;

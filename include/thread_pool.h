@@ -11,25 +11,28 @@
 typedef struct search_state search_state_t;
 
 /// @brief Work item for one parallel move search.
+/// Filled by the dispatcher before thread_pool_dispatch(); read by the pool thread.
+/// result_score is written by the thread before it posts work_done.
 typedef struct
 {
-    search_state_t *ss;           ///< Worker-owned search state; freed by the pool thread.
+    search_state_t *ss;           ///< Worker-owned search state; freed by the pool thread after search.
     move_t          move;         ///< Move to search.
-    int             depth;
-    int             ply;
-    int             alpha;
-    int             beta;
+    int             depth;        ///< Remaining depth (same as the parent's depth).
+    int             ply;          ///< Ply from the root (same as the parent's ply).
+    int             alpha;        ///< Alpha at the time of dispatch (parent's current alpha).
+    int             beta;         ///< Beta at the time of dispatch (parent's beta).
     int             result_score; ///< Written by the pool thread before signalling done.
-    atomic_bool    *cutoff;       ///< Shared cutoff flag; set by the thread when score >= beta.
+    atomic_bool    *cutoff;       ///< Per-batch flag; the thread stores true when score ≥ beta.
 } pool_work_t;
 
 /// @brief One slot in the pool: a persistent thread with its own work/done semaphores.
+/// The thread loops: wait on work_ready → execute work → post work_done.
 typedef struct
 {
     pool_work_t work;
     sem_t       work_ready; ///< Dispatcher posts to wake the thread.
     sem_t       work_done;  ///< Thread posts when result_score is ready.
-    atomic_bool shutdown;
+    atomic_bool shutdown;   ///< Set by thread_pool_destroy(); checked after work_ready fires.
     thrd_t      thread;
 } thread_pool_slot_t;
 

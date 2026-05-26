@@ -60,6 +60,10 @@ int search_single_move(search_state_t *ss, int depth, int ply, int alpha, int be
 // Null-move pruning helper
 // ---------------------------------------------------------------------------
 
+// Attempt a null move and return the resulting score (or alpha if conditions aren't met).
+// Guards: null-window only, not already a null-move, not in check, not in endgame, and the
+// side to move has a material+PST advantage of at least beta+100.  Reduction R=4.
+// Returns SEARCH_CANCELLED_SCORE if the search is interrupted during the null search.
 static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int alpha, int beta)
 {
     const position_t *position = ss_current_position(ss);
@@ -144,6 +148,17 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
 // Main alpha-beta search
 // ---------------------------------------------------------------------------
 
+// Node flow:
+//  1. Time check every 64 K nodes; draw detection; check extension.
+//  2. Transposition table lookup: CUT node → prune if score≥beta; ALL node → prune if score<alpha;
+//     PV node → extend depth by 1.
+//  3. Depth ≤ 0: fall through to quiescence search.
+//  4. Null-move pruning (attempt_null_move).
+//  5. TT move searched first (serially, before generating the full move list).
+//  6. Full move list generated and sorted; moves searched with LMR where eligible.
+//  7. Young Brothers Wait: after 3 serial moves at a null-window/depth≥4 node, remaining moves
+//     dispatched to the thread pool.
+//  8. Store result in TT (CUT / ALL / PV node type).
 int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variation_t *parent_pv)
 {
     INCREMENT("alpha beta calls");

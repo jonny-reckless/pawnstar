@@ -9,6 +9,12 @@
 #include "search_state.h"
 #include "thread_pool.h"
 
+/// @brief Entry point for each persistent pool thread.
+/// Loops indefinitely: blocks on work_ready, executes the assigned search_single_move() call,
+/// writes result_score, frees the worker search_state_t, then posts work_done.
+/// If the search is already cancelled on entry, SEARCH_CANCELLED_SCORE is returned immediately.
+/// Sets the shared cutoff flag when score >= beta so that sibling dispatches can abort early.
+/// Exits cleanly when slot->shutdown is true (set by thread_pool_destroy before posting work_ready).
 static int pool_thread_fn(void *arg)
 {
     thread_pool_slot_t *slot = arg;
@@ -36,12 +42,15 @@ static int pool_thread_fn(void *arg)
             }
         }
         w->result_score = score;
-        search_state_free(w->ss);
+        search_state_free(w->ss); ///< ss was allocated by the dispatcher; ownership passes to this thread.
         sem_post(&slot->work_done);
     }
     return 0;
 }
 
+/// @brief Allocate slot and free_stack arrays, initialize all synchronization objects, and spawn
+/// @p n_threads persistent worker threads.  The free_stack is pre-filled with indices 0..n-1 and
+/// the available semaphore is initialized to n_threads so all slots start idle.
 void thread_pool_init(thread_pool_t *self, int n_threads)
 {
     self->n_slots    = n_threads;
@@ -61,6 +70,9 @@ void thread_pool_init(thread_pool_t *self, int n_threads)
     }
 }
 
+/// @brief Signal all threads to exit (shutdown flag + work_ready post), join them, then destroy
+/// all semaphores, the mutex, and the heap allocations.  The two-pass loop (signal all, then join
+/// all) ensures threads can exit concurrently rather than serially.
 void thread_pool_destroy(thread_pool_t *self)
 {
     for (int i = 0; i < self->n_slots; ++i)
@@ -80,6 +92,9 @@ void thread_pool_destroy(thread_pool_t *self)
     free(self->free_stack);
 }
 
+/// @brief Non-blocking slot claim.  Decrements the available semaphore (returns -1 if zero), then
+/// pops a slot index from the free_stack under the lock.  The two-step design lets the caller
+/// probe availability without taking the lock — sem_trywait is the fast path.
 int thread_pool_try_acquire(thread_pool_t *self)
 {
     if (sem_trywait(&self->available) != 0)
@@ -90,18 +105,24 @@ int thread_pool_try_acquire(thread_pool_t *self)
     return idx;
 }
 
+/// @brief Copy @p work into the slot and post work_ready to wake the thread.
+/// The caller must have acquired the slot via thread_pool_try_acquire first.
 void thread_pool_dispatch(thread_pool_t *self, int slot_idx, pool_work_t work)
 {
     self->slots[slot_idx].work = work;
     sem_post(&self->slots[slot_idx].work_ready);
 }
 
+/// @brief Block until the thread posts work_done, then return the result score.
+/// Does not release the slot — call thread_pool_release after reading the result.
 int thread_pool_collect(thread_pool_t *self, int slot_idx)
 {
     sem_wait(&self->slots[slot_idx].work_done);
     return self->slots[slot_idx].work.result_score;
 }
 
+/// @brief Return @p slot_idx to the idle pool.  Pushes the index back onto free_stack under the
+/// lock, then increments available so the next try_acquire can claim it.
 void thread_pool_release(thread_pool_t *self, int slot_idx)
 {
     mtx_lock(&self->lock);

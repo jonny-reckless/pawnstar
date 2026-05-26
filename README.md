@@ -117,38 +117,42 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 `game_t` ([include/game.h](include/game.h)) owns all shared search infrastructure:
 
-- Transposition table (64 MB, direct-mapped, 24-byte entries)
-- History heuristic table: `uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`
+- Transposition table (64 MB, 24-byte entries, direct-mapped by `hash % size`; access serialized by 256 stripe mutexes indexed `table_index & 255`)
+- History heuristic table: `_Atomic uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`, accumulated with relaxed atomics so parallel workers update it safely
+- Thread pool: NumCPU persistent threads, each blocked on a per-slot POSIX semaphore until dispatched; `sem_t available` counts idle slots for non-blocking `sem_trywait` probes
 - Opening book indexed by Zobrist hash
 - Chess clock and time-control parameters
-- Position history stack (`position_t positions[256]`) for draw detection
-- `atomic_bool is_cancel_pending` — set by UCI `stop`; all search threads poll this
-- `sem_t parallel_slots` — POSIX semaphore, capacity = NumCPU, controls parallel worker count
+- Position history stack (`position_t positions[256]`) for the current game line
+- `atomic_bool is_cancel_pending` — set by UCI `stop` or time expiry; polled by all search threads
 
-Search runs on a background `thrd_t` so the UCI `stop` command can interrupt it.
+Search runs on a background `thrd_t` so the UCI `stop` command can interrupt it without blocking.
 
-`search_state_t` ([include/search_state.h](include/search_state.h)) is per-thread state: a copy-make position stack seeded at the fork point, a compact hash stack for repetition detection (16-byte `{hash, half_move_clock}` entries — cheap to copy when forking workers), a node counter, and a pointer to the shared `game_t`.
+`search_state_t` ([include/search_state.h](include/search_state.h)) is per-thread state: a copy-make `pos_stack` seeded at the fork point (so workers never touch the main game stack), a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions — cheap to copy when forking workers), a node counter, and a shared pointer to `game_t`. `search_state_t` objects are allocated from a dedicated slab pool ([include/slice_allocator.h](include/slice_allocator.h)) so allocation is O(1) and lock-contention is confined to the pool's mutex rather than the system allocator.
 
 The search ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)):
 
-- Iterative deepening from depth 3, with a shallow full-width pass for initial move ordering
-- Alpha-beta with PVS (principal variation search): re-search at full window only when a null-window scout raises alpha
-- Null-move pruning: R=4, guarded by piece count (>3 non-king pieces), not-in-check, null-window, and a PST-score advantage ≥ beta+100
-- Late-move reduction (LMR) at null-window nodes, depth > 2, non-capture, non-pawn moves: −1 ply from move 5 onward; an additional −1 from move 8; a further −1 if the move has zero history count. Failed reductions are re-searched at full depth.
-- Check extensions (+1 ply when the side to move is in check) and promotion extensions (+1 ply on promotion moves)
-- Quiescence search on captures only; positions in check fall back to full alpha-beta
-- **Young Brothers Wait (YBW) parallel search**: after 2 serial moves at a null-window node with depth ≥ 4, remaining moves are dispatched to parallel worker threads. Each worker acquires a semaphore slot via `sem_trywait` (non-blocking), forks a `search_state_t`, and signals a shared `atomic_bool cutoff` on a beta cutoff. Workers never spawn sub-workers.
+- **Iterative deepening** from START_DEPTH (3) up to MAX_PLY. A shallow full-width pass at START_DEPTH scores each root move before the first real iteration, improving move ordering for all subsequent depths.
+- **Time management** (standard clock only): allocates `ms_remaining / moves_to_go` per move; hard stop at 2× that allocation or the remaining budget minus 1 s. Early exit when the best move has been consistent across all completed depths and the score is stable within SCORE_INSTABILITY_THRESHOLD.
+- **PVS** (principal variation search): at PV nodes (beta > alpha+1), moves after the first are searched with a null window; only if the scout raises alpha is a full-window re-search issued.
+- **Null-move pruning** (R=4): at null-window nodes, when the side to move is not in check, the position was not reached by a null move, the position is not in the endgame, and the PST score exceeds beta+100, a null move is tried. If the reduced search still exceeds beta, the node is pruned.
+- **Late-move reduction (LMR)**: at null-window nodes with depth > 2, quiet non-pawn moves are reduced. Move index > 3 (4th+ move): −1 ply. Move index > 6 (7th+ move): −2 ply. Move index > 6 with zero history count: −3 ply. A move that raises alpha after reduction is re-searched at full depth.
+- **Check extension**: +1 ply when the side to move is in check.
+- **Promotion extension**: +1 ply on pawn-promotion moves.
+- **Quiescence search** on captures only; positions in check fall back to a full `search()` call so every legal reply is considered. Standing-pat (static evaluation as a lower bound) is applied before generating captures.
+- **Young Brothers Wait (YBW)**: after 3 serial moves at a null-window node with depth ≥ 4, remaining moves are dispatched to thread-pool workers. Each dispatch claims an idle slot via non-blocking `sem_trywait`; stops if none are free. Each worker gets its own fork of the `search_state_t` (pos_stack + hash_stack seeded from the parent's current position) and writes to a shared `atomic_bool cutoff` on beta cutoff. Workers never spawn sub-workers. The main thread collects all results before continuing.
 
-Move ordering: transposition-table move first (searched serially before the move list is generated), then MVV-LVA (victim value × 10000 − attacker value × 1000) combined with the history heuristic count.
+Move ordering: transposition-table move first (searched serially before the full move list is generated), then MVV-LVA (victim value × 10000 − attacker value × 1000) combined with the history heuristic count.
 
 ### Evaluation
 
-Material and piece-square scores are maintained incrementally in `position_t::scores[2]`, updated on every `position_add/remove/move_piece` call; undo is free under the copy-make model. `evaluate_position` ([include/evaluation.h](include/evaluation.h), [src/evaluation.c](src/evaluation.c)) reads these cached scores for a fast lazy-evaluation cutoff (±200 cp), then falls through to compute:
+Material and piece-square scores are maintained incrementally in `position_t::scores[2]`, updated on every `position_add/remove/move_piece` call; undo is free under copy-make. `evaluate_position` ([include/evaluation.h](include/evaluation.h), [src/evaluation.c](src/evaluation.c)) reads these cached scores for a lazy-evaluation cutoff (±200 cp of the window), then falls through to compute:
 
-- Bishop-pair bonus
-- Pawn structure: passed, isolated, backward, doubled, and defended pawns
-- Mobility
-- King safety (pawn shelter, attacking pieces near the king)
+- **Bishop-pair bonus**: +30 cp when a side has bishops on both light and dark squares.
+- **Pawn structure** (per pawn): passed pawn bonus scaled by rank (up to +30 cp on rank 7); defended pawn +5 cp; backward pawn −10 cp; doubled pawn −10 cp; isolated pawn −20 cp. Passed pawns that are also doubled are excluded from the bonus.
+- **Mobility**: bishop and rook attacks counted with occupied-square masking. Attack counts are looked up in `BISHOP_ATTACK_SCORES[14]` and `ROOK_ATTACK_SCORES[15]` (negative for low mobility, up to +20 cp for high mobility). Bishop attacks onto squares defended by enemy pawns are excluded.
+- **King safety**: pawn-shelter check up to three ranks ahead (±15/10/5 cp per pawn in each rank); open-file penalties (−15 cp if the king's file has no friendly pawns, −10 cp per open adjacent file); adjacent-piece bonus (+10 cp per friendly non-pawn piece in king ring-1, +5 cp in ring-2); PST switches from `KING_SQUARE_MIDGAME` (castled-corner preference) to `KING_SQUARE_ENDGAME` (centralisation) based on endgame detection. Pawn-shelter and open-file penalties are only applied in the middlegame.
+
+Piece values: P=100, N=300, B=300, R=500, Q=900.
 
 Static exchange evaluation ([include/static_exchange_evaluation.h](include/static_exchange_evaluation.h)) estimates the material outcome of a capture sequence for move ordering.
 
