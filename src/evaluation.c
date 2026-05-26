@@ -249,23 +249,6 @@ static inline int evaluate_pawn_structure(const pawn_structure_t *ps, color_t co
     return score;
 }
 
-static inline bool is_in_endgame(const position_t *pos)
-{
-    for (color_t color = WHITE; color <= BLACK; ++color)
-    {
-        const bitboard_t friendly = position_pieces_of_color(pos, color);
-        if ((pos->queens & friendly) == 0)
-        {
-            continue;
-        }
-        if (popcount(pos->rooks & friendly) > 0 || popcount((pos->knights | pos->bishops) & friendly) > 1)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 static inline int evaluate_king(const position_t *pos, color_t color, bool is_endgame)
 {
     const uint8_t    rank_flip       = color == WHITE ? RANK_FLIP : 0;

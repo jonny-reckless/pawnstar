@@ -15,8 +15,8 @@
 // Single-move search
 // ---------------------------------------------------------------------------
 
-int search_single_move(search_state_t *ss, int depth, int ply, int alpha, int beta, move_t move,
-                       variation_t *pv, int move_index)
+int search_single_move(search_state_t *ss, int depth, int ply, int alpha, int beta, move_t move, variation_t *pv,
+                       int move_index)
 {
     const position_t *position     = ss_current_position(ss);
     const bool        was_in_check = position_is_in_check(position);
@@ -64,8 +64,8 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 {
     const position_t *position = ss_current_position(ss);
     const color_t     color    = position_color_to_move(position);
-    if (!position_is_null_move(position) && !position_is_in_check(position) && beta == alpha + 1 &&
-        popcount(position_pieces_of_color(position, color)) > 3)
+    if (beta == alpha + 1 && !position_is_null_move(position) && !position_is_in_check(position) &&
+        !is_in_endgame(position))
     {
         const int pst_score = color == WHITE ? position->scores[WHITE] - position->scores[BLACK]
                                              : position->scores[BLACK] - position->scores[WHITE];
@@ -97,8 +97,8 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 
 /// @brief Dispatch @p n_moves remaining moves to pool worker threads and return the best scored move.
 /// Only called when beta == alpha+1 (null window) and ss_can_go_parallel() is true.
-static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves,
-                                    int depth, int ply, int alpha, int beta)
+static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves, int depth, int ply, int alpha,
+                                    int beta)
 {
     INCREMENT("parallel searches");
 
@@ -225,8 +225,8 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
     if (has_transposition && !move_equals(transposition.move, move_none()))
     {
         INCREMENT("table move");
-        best_move  = transposition.move;
-        int score  = search_single_move(ss, depth, ply, alpha, beta, transposition.move, &pv, 0);
+        best_move = transposition.move;
+        int score = search_single_move(ss, depth, ply, alpha, beta, transposition.move, &pv, 0);
         if (ss_is_cancelled(ss))
         {
             return SEARCH_CANCELLED_SCORE;
@@ -234,7 +234,7 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            transposition_t rec = {position->hash, transposition.move, score,
+            transposition_t rec = {position->hash, transposition.move,         score,
                                    (int16_t)depth, (uint8_t)TRANSPOSITION_CUT, false};
             transposition_table_record(&ss->game->transposition_table, &rec);
             history_table_record_good_move(&ss->game->history_table, ply, transposition.move);
@@ -273,8 +273,8 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
         }
 
         int lmr_depth = depth;
-        if (i > 3 && !position_is_in_check(position) && depth > 2 && beta == alpha + 1 &&
-            move_captured(move) == NONE && move_piece(move) != PAWN)
+        if (i > 3 && !position_is_in_check(position) && depth > 2 && beta == alpha + 1 && move_captured(move) == NONE &&
+            move_piece(move) != PAWN)
         {
             INCREMENT("late move reduction 1");
             --lmr_depth;
@@ -304,8 +304,7 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            transposition_t rec = {position->hash, move, score,
-                                   (int16_t)depth, (uint8_t)TRANSPOSITION_CUT, false};
+            transposition_t rec = {position->hash, move, score, (int16_t)depth, (uint8_t)TRANSPOSITION_CUT, false};
             transposition_table_record(&ss->game->transposition_table, &rec);
             history_table_record_good_move(&ss->game->history_table, ply, move);
             return score;
@@ -327,7 +326,7 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
 
         // After searching 2 serial moves at a null-window node without a cutoff, assume this is an
         // all-node and dispatch remaining moves in parallel (Young Brothers Wait).
-        if (i >= 1 && !ss_is_cancelled(ss) && beta == alpha + 1 && ss_can_go_parallel(ss, depth) &&
+        if (i > 1 && !ss_is_cancelled(ss) && beta == alpha + 1 && ss_can_go_parallel(ss, depth) &&
             i + 1 < move_list.size)
         {
             move_t parallel_moves[MAX_MOVES_PER_POSITION];
@@ -341,8 +340,7 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
             }
             if (n_parallel > 0)
             {
-                move_t parallel_best  = search_moves_parallel(ss, parallel_moves, n_parallel,
-                                                              depth, ply, alpha, beta);
+                move_t parallel_best = search_moves_parallel(ss, parallel_moves, n_parallel, depth, ply, alpha, beta);
                 if (ss_is_cancelled(ss))
                 {
                     return SEARCH_CANCELLED_SCORE;
@@ -350,8 +348,9 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
                 int parallel_score = move_score(parallel_best);
                 if (parallel_score >= beta)
                 {
-                    transposition_t rec = {position->hash, parallel_best, parallel_score,
-                                           (int16_t)depth, (uint8_t)TRANSPOSITION_CUT, false};
+                    transposition_t rec = {
+                        position->hash, parallel_best, parallel_score, (int16_t)depth, (uint8_t)TRANSPOSITION_CUT,
+                        false};
                     transposition_table_record(&ss->game->transposition_table, &rec);
                     return parallel_score;
                 }
@@ -376,7 +375,8 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
     else
     {
         INCREMENT("all nodes");
-        transposition_t rec = {position->hash, best_move, best_score, (int16_t)depth, (uint8_t)TRANSPOSITION_ALL, false};
+        transposition_t rec = {position->hash, best_move, best_score, (int16_t)depth, (uint8_t)TRANSPOSITION_ALL,
+                               false};
         transposition_table_record(&ss->game->transposition_table, &rec);
     }
     return best_score;
