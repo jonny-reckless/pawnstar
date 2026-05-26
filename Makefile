@@ -10,7 +10,7 @@ GENERATOR_EXE    = generate_constants/gen_constants
 ifeq ($(DEBUG), 1)
 	CFLAGS += -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
 else
-	CFLAGS += -g -O3 -D NDEBUG
+	CFLAGS += -g -O3
 endif
 
 # ─── Engine static library ────────────────────────────────────────────────────
@@ -82,9 +82,9 @@ $(GENERATED_DATA): $(GENERATOR_EXE)
 test: prep $(LIB) $(TEST_EXES)
 
 check: test
+	$(TEST_BUILD_DIR)/test_see
 	$(TEST_BUILD_DIR)/test_perft 5
 	$(TEST_BUILD_DIR)/test_bratko_kopec
-	$(TEST_BUILD_DIR)/test_see
 
 $(TEST_BUILD_DIR):
 	mkdir -p $@

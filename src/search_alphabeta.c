@@ -1,5 +1,6 @@
 /// @file Alpha-beta search with Young Brothers Wait parallel dispatch.
 
+#include <assert.h>
 #include <stdatomic.h>
 
 #include "chess_clock.h"
@@ -99,14 +100,40 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 // Young Brothers Wait parallel search
 // ---------------------------------------------------------------------------
 
+/// @brief Pool work function: execute one parallel move search and signal a cutoff if found.
+/// Checks for cancellation before searching. Frees the worker search_state_t on completion.
+static int search_work_fn(pool_work_t *work)
+{
+    int score;
+    assert(work->beta == work->alpha + 1);
+    if (ss_is_cancelled(work->ss))
+    {
+        score = SEARCH_CANCELLED_SCORE;
+    }
+    else
+    {
+        variation_t dummy;
+        variation_clear(&dummy);
+        score = search_single_move(work->ss, work->depth, work->ply, work->alpha, work->beta, work->move, &dummy, 0);
+        if (score >= work->beta)
+        {
+            INCREMENT("parallel cutoffs");
+            atomic_store(work->was_cutoff, true);
+        }
+    }
+    search_state_free(work->ss);
+    return score;
+}
+
 /// @brief Dispatch @p n_moves remaining moves to pool worker threads and return the best scored move.
 /// Only called when beta == alpha+1 (null window) and ss_can_go_parallel() is true.
 /// @p skip_move is the TT move (already searched serially by the caller); matching moves are skipped.
 /// Pass move_none() when there is no TT move to skip.
-static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves, move_t skip_move,
-                                    int depth, int ply, int alpha, int beta)
+static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves, move_t skip_move, int depth,
+                                    int ply, int alpha, int beta)
 {
     INCREMENT("parallel searches");
+    assert(beta == alpha + 1);
 
     atomic_bool cutoff;
     atomic_init(&cutoff, false);
@@ -130,7 +157,7 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
             break;
         }
         pool_work_t work = {search_state_worker(ss, &cutoff), moves[i], depth, ply, alpha, beta, ALPHA, &cutoff};
-        thread_pool_dispatch(pool, slot, work);
+        thread_pool_dispatch(pool, slot, work, search_work_fn);
         dispatched[n_dispatched]       = slot;
         dispatched_moves[n_dispatched] = moves[i];
         INCREMENT("parallel moves searched");
@@ -151,6 +178,12 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
         }
     }
 
+    if (best_score >= beta)
+    {
+        INCREMENT("parallel search beta cutoffs");
+        return best;
+    }
+
     // Search any moves that couldn't be dispatched (pool was exhausted).
     for (int i = serial_from; i < n_moves; ++i)
     {
@@ -167,8 +200,12 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
             best_score = score;
             best       = move_with_score(moves[i], best_score);
         }
+        if (score >= beta)
+        {
+            INCREMENT("parallel search fallback beta cutoffs");
+            return best;
+        }
     }
-
     return best;
 }
 
@@ -369,8 +406,8 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
 
         // After searching 2 serial moves at a null-window node without a cutoff, assume this is an
         // all-node and dispatch remaining moves in parallel (Young Brothers Wait).
-        if (i > 1 && !ss_is_cancelled(ss) && beta == alpha + 1 && ss_can_go_parallel(ss, depth) &&
-            i + 1 < move_list.size)
+        if (i > 1 && beta == alpha + 1 && !ss_is_cancelled(ss) && ss_can_go_parallel(ss, depth) &&
+            (i + 1) < move_list.size)
         {
             move_t skip       = has_transposition ? transposition.move : move_none();
             int    n_parallel = move_list.size - i - 1;

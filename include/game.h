@@ -10,6 +10,7 @@
 #include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
+#include "slice_allocator.h"
 #include "thread_pool.h"
 #include "transposition_table.h"
 
@@ -27,6 +28,7 @@ typedef struct game
     thrd_t                worker_thread;                  ///< Background thread running the search.
     bool                  worker_running;                 ///< True while worker_thread is alive and joinable.
     thread_pool_t         thread_pool;                    ///< Persistent worker threads for parallel move search (NumCPU threads).
+    slice_allocator_t     ss_pool;                        ///< Slab pool for search_state_t allocation during search.
     position_t            positions[POSITION_STACK_SIZE]; ///< Position history stack (copy-make).
     position_t           *position;                       ///< Pointer to the current position (top of stack).
 } game_t;

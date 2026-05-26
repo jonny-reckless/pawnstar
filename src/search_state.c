@@ -1,26 +1,13 @@
 /// @file Per-thread search state constructors and repetition detection.
 
 #include <string.h>
-#include <threads.h>
 
 #include "debug_hashtable.h"
 #include "search_state.h"
-#include "slice_allocator.h"
-
-#define SS_POOL_CAPACITY 1000
-
-static slice_allocator_t ss_pool;
-static once_flag         ss_pool_once = ONCE_FLAG_INIT;
-
-static void init_ss_pool(void)
-{
-    slice_allocator_init(&ss_pool, sizeof(search_state_t), SS_POOL_CAPACITY);
-}
 
 search_state_t *search_state_from_game(game_t *game)
 {
-    call_once(&ss_pool_once, init_ss_pool);
-    search_state_t *ss = slice_allocator_alloc(&ss_pool);
+    search_state_t *ss = slice_allocator_alloc(&game->ss_pool);
     int n = (int)(game->position - game->positions) + 1;
     for (int i = 0; i < n; ++i)
     {
@@ -37,7 +24,7 @@ search_state_t *search_state_from_game(game_t *game)
 
 search_state_t *search_state_worker(const search_state_t *parent, atomic_bool *cutoff)
 {
-    search_state_t *ss = slice_allocator_alloc(&ss_pool);
+    search_state_t *ss = slice_allocator_alloc(&parent->game->ss_pool);
     ss->hash_len = parent->hash_len;
     memcpy(ss->hash_stack, parent->hash_stack, (size_t)parent->hash_len * sizeof(hash_stack_entry_t));
     ss->pos_stack[0] = parent->pos_stack[parent->pos_len - 1];
@@ -50,7 +37,7 @@ search_state_t *search_state_worker(const search_state_t *parent, atomic_bool *c
 
 void search_state_free(search_state_t *ss)
 {
-    slice_allocator_free(&ss_pool, ss);
+    slice_allocator_free(&ss->game->ss_pool, ss);
 }
 
 bool ss_is_draw_by_repetition(const search_state_t *ss)

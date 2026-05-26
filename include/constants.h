@@ -7,6 +7,7 @@ typedef uint64_t zobrist_t; ///< Zobrist hash type.
 #define MAX_MOVES_PER_POSITION      256         ///< maximum possible number of moves for a chess position
 #define MAX_PLY                     64          ///< terminate the search at this ply no matter what
 #define HASHTABLE_MEGABYTES         64          ///< default transposition table size in MB
+#define NUM_ALLOCATOR_SLICES        1024        ///< number of search state slices in the memory allocator
 #define BETA                        11000       ///< greater than any possible evaluation score
 #define ALPHA                       (-11000)    ///< smaller than any possible evaluation score
 #define CHECKMATED_SCORE            (-10000)    ///< score for losing the game

@@ -22,14 +22,19 @@ typedef struct
     int             alpha;        ///< Alpha at the time of dispatch (parent's current alpha).
     int             beta;         ///< Beta at the time of dispatch (parent's beta).
     int             result_score; ///< Written by the pool thread before signalling done.
-    atomic_bool    *cutoff;       ///< Per-batch flag; the thread stores true when score ≥ beta.
+    atomic_bool    *was_cutoff;   ///< Per-batch flag; the thread stores true when score ≥ beta.
 } pool_work_t;
 
+/// @brief Function executed by a pool thread to process one work item.
+/// Returns the result score, which the pool thread stores in work->result_score.
+typedef int (*pool_fn_t)(pool_work_t *work);
+
 /// @brief One slot in the pool: a persistent thread with its own work/done semaphores.
-/// The thread loops: wait on work_ready → execute work → post work_done.
+/// The thread loops: wait on work_ready → call fn(work) → post work_done.
 typedef struct
 {
     pool_work_t work;
+    pool_fn_t   fn;         ///< Function to call; set by thread_pool_dispatch.
     sem_t       work_ready; ///< Dispatcher posts to wake the thread.
     sem_t       work_done;  ///< Thread posts when result_score is ready.
     atomic_bool shutdown;   ///< Set by thread_pool_destroy(); checked after work_ready fires.
@@ -58,8 +63,8 @@ void thread_pool_destroy(thread_pool_t *self);
 /// @brief Non-blocking: claim an idle slot. Returns the slot index, or -1 if none are available.
 int thread_pool_try_acquire(thread_pool_t *self);
 
-/// @brief Set the work item on @p slot_idx and wake its thread.
-void thread_pool_dispatch(thread_pool_t *self, int slot_idx, pool_work_t work);
+/// @brief Set the work item and function on @p slot_idx and wake its thread.
+void thread_pool_dispatch(thread_pool_t *self, int slot_idx, pool_work_t work, pool_fn_t fn);
 
 /// @brief Block until @p slot_idx's thread finishes and return the result score.
 int thread_pool_collect(thread_pool_t *self, int slot_idx);

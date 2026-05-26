@@ -8,6 +8,7 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
+#include "search_state.h"
 #include "transposition_table.h"
 
 /// @brief Centipawn values for each piece type indexed by piece_t (NONE through KING).
@@ -35,9 +36,11 @@ void game_init(game_t *self)
     history_table_init(&self->history_table);
     opening_book_init(&self->book);
     self->worker_running = false;
-    int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (nprocs < 1) nprocs = 1;
+    int nprocs           = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs < 1)
+        nprocs = 1;
     thread_pool_init(&self->thread_pool, nprocs);
+    slice_allocator_init(&self->ss_pool, sizeof(search_state_t), NUM_ALLOCATOR_SLICES);
     game_new_game_default(self);
 }
 
@@ -48,12 +51,13 @@ void game_free(game_t *self)
     history_table_free(&self->history_table);
     opening_book_free(&self->book);
     thread_pool_destroy(&self->thread_pool);
+    slice_allocator_destroy(&self->ss_pool);
 }
 
 void game_new_game(game_t *self, const char *fen_string)
 {
     chess_clock_init(&self->time_control);
-    self->node_count   = 0;
+    self->node_count = 0;
     atomic_store(&self->is_cancel_pending, false);
     self->position     = &self->positions[0];
     self->positions[0] = position_from_string(fen_string);

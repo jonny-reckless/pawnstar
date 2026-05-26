@@ -2,11 +2,6 @@
 
 #include <stdlib.h>
 
-#include "constants.h"
-#include "debug_hashtable.h"
-#include "move.h"
-#include "search.h"
-#include "search_state.h"
 #include "thread_pool.h"
 
 /// @brief Entry point for each persistent pool thread.
@@ -24,25 +19,7 @@ static int pool_thread_fn(void *arg)
         if (atomic_load_explicit(&slot->shutdown, memory_order_relaxed))
             break;
 
-        pool_work_t *w = &slot->work;
-        int          score;
-        if (ss_is_cancelled(w->ss))
-        {
-            score = SEARCH_CANCELLED_SCORE;
-        }
-        else
-        {
-            variation_t pv;
-            variation_clear(&pv);
-            score = search_single_move(w->ss, w->depth, w->ply, w->alpha, w->beta, w->move, &pv, 0);
-            if (score >= w->beta)
-            {
-                INCREMENT("parallel cutoffs");
-                atomic_store(w->cutoff, true);
-            }
-        }
-        w->result_score = score;
-        search_state_free(w->ss); ///< ss was allocated by the dispatcher; ownership passes to this thread.
+        slot->work.result_score = slot->fn(&slot->work);
         sem_post(&slot->work_done);
     }
     return 0;
@@ -107,9 +84,10 @@ int thread_pool_try_acquire(thread_pool_t *self)
 
 /// @brief Copy @p work into the slot and post work_ready to wake the thread.
 /// The caller must have acquired the slot via thread_pool_try_acquire first.
-void thread_pool_dispatch(thread_pool_t *self, int slot_idx, pool_work_t work)
+void thread_pool_dispatch(thread_pool_t *self, int slot_idx, pool_work_t work, pool_fn_t fn)
 {
     self->slots[slot_idx].work = work;
+    self->slots[slot_idx].fn   = fn;
     sem_post(&self->slots[slot_idx].work_ready);
 }
 
