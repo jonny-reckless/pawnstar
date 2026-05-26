@@ -16,26 +16,32 @@ void debug_x_clear(void)
     memset(&debug_dictionary, 0, sizeof(debug_dictionary));
 }
 
-static int compare_debug_entries(const void *a, const void *b)
+typedef struct
 {
-    const debug_entry_t *ea = (const debug_entry_t *)a;
-    const debug_entry_t *eb = (const debug_entry_t *)b;
+    const char *key;
+    int64_t     value;
+} snapshot_entry_t;
+
+static int compare_snapshot_entries(const void *a, const void *b)
+{
+    const snapshot_entry_t *ea = (const snapshot_entry_t *)a;
+    const snapshot_entry_t *eb = (const snapshot_entry_t *)b;
     if (!ea->key)
-    {
         return eb->key ? 1 : 0;
-    }
     if (!eb->key)
-    {
         return -1;
-    }
     return strcmp(ea->key, eb->key);
 }
 
 void debug_x_write(void)
 {
-    debug_entry_t sorted[DEBUG_TABLE_SIZE];
-    memcpy(sorted, debug_dictionary.buckets, sizeof(sorted));
-    qsort(sorted, DEBUG_TABLE_SIZE, sizeof(debug_entry_t), compare_debug_entries);
+    snapshot_entry_t sorted[DEBUG_TABLE_SIZE];
+    for (int i = 0; i < DEBUG_TABLE_SIZE; ++i)
+    {
+        sorted[i].key   = atomic_load_explicit(&debug_dictionary.buckets[i].key,   memory_order_seq_cst);
+        sorted[i].value = atomic_load_explicit(&debug_dictionary.buckets[i].value, memory_order_seq_cst);
+    }
+    qsort(sorted, DEBUG_TABLE_SIZE, sizeof(snapshot_entry_t), compare_snapshot_entries);
 
     printf("********************* DEBUGX *********************\n");
     for (int i = 0; i < DEBUG_TABLE_SIZE && sorted[i].key; ++i)

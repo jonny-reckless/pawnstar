@@ -1,5 +1,6 @@
 #pragma once
 /// @file History heuristic table: tracks which moves have historically raised alpha or caused cutoffs.
+#include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -8,9 +9,10 @@
 
 /// @brief Per-ply history counts indexed by the combined from+to square index of each move.
 /// Counts are accumulated across the search and used to bias move ordering.
+/// _Atomic allows parallel worker threads to increment without data races.
 typedef struct
 {
-    uint32_t *counts; ///< Heap-allocated array of size MAX_PLY × 4096 (one entry per ply × from+to pair).
+    _Atomic uint32_t *counts; ///< Heap-allocated array of size MAX_PLY × 4096 (one entry per ply × from+to pair).
 } history_table_t;
 
 /// @brief Allocate and zero-initialize the history table.
@@ -28,11 +30,11 @@ uint32_t history_table_max_count(const history_table_t *self);
 /// @brief Increment the count for @p move at @p ply (called when a move raises alpha or causes a cutoff).
 static inline void history_table_record_good_move(history_table_t *self, int ply, move_t move)
 {
-    ++self->counts[ply * 4096 + move_from_to(move)];
+    atomic_fetch_add_explicit(&self->counts[ply * 4096 + move_from_to(move)], 1, memory_order_relaxed);
 }
 
 /// @brief Return the count for @p move at @p ply.
 static inline uint32_t history_table_get_count(const history_table_t *self, int ply, move_t move)
 {
-    return self->counts[ply * 4096 + move_from_to(move)];
+    return atomic_load_explicit(&self->counts[ply * 4096 + move_from_to(move)], memory_order_relaxed);
 }

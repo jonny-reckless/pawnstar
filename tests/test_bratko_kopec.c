@@ -65,14 +65,14 @@ int main(int argc, char *argv[])
     {
         const bk_case_t *tc = &CASES[i];
 
-        game_t game;
-        game_init(&game);
-        game_new_game(&game, tc->fen);
-        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-        game.time_control.depth      = (max_depth > 0 && max_depth < tc->depth) ? max_depth : tc->depth;
+        game_t *game = malloc(sizeof *game);
+        game_init(game);
+        game_new_game(game, tc->fen);
+        game->time_control.clock_type = CLOCK_FIXED_DEPTH;
+        game->time_control.depth      = (max_depth > 0 && max_depth < tc->depth) ? max_depth : tc->depth;
 
         debug_x_clear();
-        move_t best = search_root_node(&game);
+        move_t best = search_root_node(game);
         debug_x_write();
 
         char got[8] = {0};
@@ -87,7 +87,8 @@ int main(int argc, char *argv[])
         if (!pass)
             failures++;
 
-        game_free(&game);
+        game_free(game);
+        free(game);
     }
 
     printf("\n%d/%d passed\n", NUM_CASES - failures, NUM_CASES);

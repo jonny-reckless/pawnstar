@@ -3,11 +3,14 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <threads.h>
 
 #include <assert.h>
 
 #include "constants.h"
 #include "move.h"
+
+#define TT_STRIPE_COUNT 256 ///< Number of mutex stripes; must be a power of two.
 
 /// @brief Classification of a transposition table entry by the search result type.
 typedef enum
@@ -32,10 +35,13 @@ static_assert(sizeof(transposition_t) == 24, "transposition_t layout changed");
 
 /// @brief The transposition table: a fixed-size heap-allocated hash table.
 /// Indexed by hash % size; collisions overwrite the existing entry.
+/// Concurrent access from parallel worker threads is serialized per stripe:
+/// entry at index i is protected by stripes[i & (TT_STRIPE_COUNT - 1)].
 typedef struct
 {
-    transposition_t *table; ///< Heap-allocated array of entries.
-    size_t           size;  ///< Number of entries.
+    transposition_t *table;                    ///< Heap-allocated array of entries.
+    size_t           size;                     ///< Number of entries.
+    mtx_t            stripes[TT_STRIPE_COUNT]; ///< Per-stripe mutexes.
 } transposition_table_t;
 
 /// @brief Allocate a transposition table of @p megabytes.
@@ -45,7 +51,7 @@ void transposition_table_init(transposition_table_t *self, size_t megabytes);
 void transposition_table_free(transposition_table_t *self);
 
 /// @brief Look up @p hash in the table. Returns true and fills @p out if found.
-bool transposition_table_find(const transposition_table_t *self, zobrist_t hash, transposition_t *out);
+bool transposition_table_find(transposition_table_t *self, zobrist_t hash, transposition_t *out);
 
 /// @brief Write entry @p t into the table (may overwrite an existing entry).
 void transposition_table_record(transposition_table_t *self, const transposition_t *t);
