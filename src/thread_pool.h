@@ -33,7 +33,7 @@ typedef int (*pool_fn_t)(pool_work_t *work);
 /// The thread loops: wait on work_ready → call fn(work) → post work_done.
 typedef struct
 {
-    pool_work_t work;
+    pool_work_t work;       ///< work function args.
     pool_fn_t   fn;         ///< Function to call; set by thread_pool_dispatch.
     sem_t       work_ready; ///< Dispatcher posts to wake the thread.
     sem_t       work_done;  ///< Thread posts when result_score is ready.

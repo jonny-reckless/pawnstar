@@ -28,7 +28,9 @@ uint32_t history_table_max_count(const history_table_t *self)
     {
         uint32_t v = atomic_load_explicit(&self->counts[i], memory_order_relaxed);
         if (v > max)
+        {
             max = v;
+        }
     }
     return max;
 }

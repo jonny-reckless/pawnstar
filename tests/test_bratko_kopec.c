@@ -77,7 +77,9 @@ int main(int argc, char *argv[])
 
         char got[8] = {0};
         if (best != move_none())
+        {
             move_to_string(best, got, sizeof(got));
+        }
 
         int pass = (best != move_none()) && (strcmp(got, tc->expected_move) == 0);
         printf("[%s]  pos%02d  got=%-5s  expected=%-5s  %s\n\n", pass ? "PASS" : "FAIL", i + 1, got, tc->expected_move,
@@ -85,7 +87,9 @@ int main(int argc, char *argv[])
         fflush(stdout);
 
         if (!pass)
+        {
             failures++;
+        }
 
         game_free(game);
         free(game);

@@ -40,7 +40,9 @@ int main(void)
         int          pass   = (result.score == tc->expected);
         printf("[%s]  %s  score=%d  expected=%d\n", pass ? "PASS" : "FAIL", tc->label, result.score, tc->expected);
         if (!pass)
+        {
             failures++;
+        }
     }
 
     printf("\n%d/%d passed\n", NUM_CASES - failures, NUM_CASES);

@@ -147,9 +147,13 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     for (int i = 0; i < n_moves; ++i)
     {
         if (move_equals(moves[i], skip_move))
+        {
             continue;
+        }
         if (atomic_load(&cutoff) || atomic_load_explicit(&ss->game->is_cancel_pending, memory_order_relaxed))
+        {
             break;
+        }
         int slot = thread_pool_try_acquire(pool);
         if (slot < 0)
         {
@@ -188,9 +192,13 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     for (int i = serial_from; i < n_moves; ++i)
     {
         if (move_equals(moves[i], skip_move))
+        {
             continue;
+        }
         if (ss_is_cancelled(ss) || best_score >= beta)
+        {
             break;
+        }
         INCREMENT("parallel fallback serial");
         variation_t pv;
         variation_clear(&pv);

@@ -16,7 +16,7 @@
 /// 16 bytes vs 160 bytes for a full position_t — makes worker forks cheap.
 typedef struct
 {
-    zobrist_t hash;           ///< Zobrist hash of the position.
+    zobrist_t hash;            ///< Zobrist hash of the position.
     uint8_t   half_move_clock; ///< Half-move clock at this position.
 } hash_stack_entry_t;
 

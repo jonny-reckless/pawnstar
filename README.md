@@ -85,7 +85,7 @@ The executables can also be run individually after `make test` has built them:
 
 ### Board representation
 
-`position_t` ([include/position.h](include/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, `scores[2]` — incrementally maintained material + piece-square totals for each side — and the Zobrist hash, checker bitboard, castling rights, en-passant square, and half/full-move counters, all as direct fields.
+`position_t` ([src/position.h](src/position.h)) is the central state struct. It holds six per-piece bitboards (`pawns`, `knights`, …, `kings`), two per-color bitboards, a `squares[64]` array for O(1) piece lookup, `scores[2]` — incrementally maintained material + piece-square totals for each side — and the Zobrist hash, checker bitboard, castling rights, en-passant square, and half/full-move counters, all as direct fields.
 
 Move application uses **copy-make**: `position_make_move(dst, src, move)` copies `src` into `dst` and applies the move to `dst`. Undo is a free pointer decrement. `game_t` maintains a stack of `position_t` objects for the current game line.
 
@@ -109,17 +109,17 @@ Move application uses **copy-make**: `position_make_move(dst, src, move)` copies
 
 ### Attack generation
 
-`bishop_attacks` and `rook_attacks` ([include/attacks.h](include/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`. A classical ray-subtraction fallback is available for non-BMI2 builds (`USE_PEXT_BITBOARDS=0`).
+`bishop_attacks` and `rook_attacks` ([src/attacks.h](src/attacks.h)) use BMI2 `_pext_u64` with precomputed occupancy masks and shared attack sets to compute sliding-piece attacks in two instructions. The lookup tables live in `src/generated_data.c`. A classical ray-subtraction fallback is available for non-BMI2 builds (`USE_PEXT_BITBOARDS=0`).
 
-Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-pin masks before move generation, allowing the legal-move generator to filter pinned pieces efficiently.
+Pin detection ([src/pins.h](src/pins.h)) computes pin rays and absolute-pin masks before move generation, allowing the legal-move generator to filter pinned pieces efficiently.
 
 ### Search
 
-`game_t` ([include/game.h](include/game.h)) owns all shared search infrastructure:
+`game_t` ([src/game.h](src/game.h)) owns all shared search infrastructure:
 
 - Transposition table (64 MB, 24-byte entries, direct-mapped by `hash % size`; access serialized by 256 stripe mutexes indexed `table_index & 255`)
 - History heuristic table: `_Atomic uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`, accumulated with relaxed atomics so parallel workers update it safely
-- Thread pool: NumCPU persistent threads, each blocked on a per-slot POSIX semaphore until dispatched; `sem_t available` counts idle slots for non-blocking `sem_trywait` probes
+- Thread pool: NumCPU persistent threads, each blocked on a per-slot POSIX semaphore until dispatched; `sem_t available` counts idle slots for non-blocking `sem_trywait` probes; each dispatch carries a `pool_fn_t` function pointer so the pool is decoupled from search logic
 - Opening book indexed by Zobrist hash
 - Chess clock and time-control parameters
 - Position history stack (`position_t positions[256]`) for the current game line
@@ -127,7 +127,7 @@ Pin detection ([include/pins.h](include/pins.h)) computes pin rays and absolute-
 
 Search runs on a background `thrd_t` so the UCI `stop` command can interrupt it without blocking.
 
-`search_state_t` ([include/search_state.h](include/search_state.h)) is per-thread state: a copy-make `pos_stack` seeded at the fork point (so workers never touch the main game stack), a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions — cheap to copy when forking workers), a node counter, and a shared pointer to `game_t`. `search_state_t` objects are allocated from a dedicated slab pool ([include/slice_allocator.h](include/slice_allocator.h)) so allocation is O(1) and lock-contention is confined to the pool's mutex rather than the system allocator.
+`search_state_t` ([src/search_state.h](src/search_state.h)) is per-thread state: a copy-make `pos_stack` seeded at the fork point (so workers never touch the main game stack), a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions — cheap to copy when forking workers), a node counter, and a shared pointer to `game_t`. `search_state_t` objects are allocated from a dedicated slab pool ([src/slice_allocator.h](src/slice_allocator.h)) so allocation is O(1) and lock-contention is confined to the pool's mutex rather than the system allocator.
 
 The search ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)):
 
@@ -145,7 +145,7 @@ Move ordering: transposition-table move first (searched serially before the full
 
 ### Evaluation
 
-Material and piece-square scores are maintained incrementally in `position_t::scores[2]`, updated on every `position_add/remove/move_piece` call; undo is free under copy-make. `evaluate_position` ([include/evaluation.h](include/evaluation.h), [src/evaluation.c](src/evaluation.c)) reads these cached scores for a lazy-evaluation cutoff (±200 cp of the window), then falls through to compute:
+Material and piece-square scores are maintained incrementally in `position_t::scores[2]`, updated on every `position_add/remove/move_piece` call; undo is free under copy-make. `evaluate_position` ([src/evaluation.h](src/evaluation.h), [src/evaluation.c](src/evaluation.c)) reads these cached scores for a lazy-evaluation cutoff (±200 cp of the window), then falls through to compute:
 
 - **Bishop-pair bonus**: +30 cp when a side has bishops on both light and dark squares.
 - **Pawn structure** (per pawn): passed pawn bonus scaled by rank (up to +30 cp on rank 7); defended pawn +5 cp; backward pawn −10 cp; doubled pawn −10 cp; isolated pawn −20 cp. Passed pawns that are also doubled are excluded from the bonus.
@@ -154,7 +154,7 @@ Material and piece-square scores are maintained incrementally in `position_t::sc
 
 Piece values: P=100, N=300, B=300, R=500, Q=900.
 
-Static exchange evaluation ([include/static_exchange_evaluation.h](include/static_exchange_evaluation.h)) estimates the material outcome of a capture sequence for move ordering.
+Static exchange evaluation ([src/static_exchange_evaluation.h](src/static_exchange_evaluation.h)) estimates the material outcome of a capture sequence for move ordering.
 
 ### Opening book
 
@@ -167,8 +167,9 @@ The opening book is loaded from a plain-text file (one line of play per line, mo
 - **Types**: `lower_snake_case_t` (e.g. `position_t`, `move_t`, `bitboard_t`)
 - **Functions**: `type_verb` or `type_verb_noun` (e.g. `position_make_move`, `move_list_push_back`)
 - **Constants and macros**: `UPPER_SNAKE_CASE` (e.g. `MAX_PLY`, `PIECE_VALUES`, `BB_FOREACH`)
-- **Files**: one logical module per `.h`/`.c` pair; inline functions live in the header
+- **Files**: one logical module per `.h`/`.c` pair in `src/`; inline functions live in the header
 - All headers are self-contained (`#pragma once`, explicit includes)
+- All control-flow bodies use braces, enforced by `InsertBraces: true` in `.clang-format`
 - Doxygen comments (`/// @brief`, `///<`) on all public types and functions
 
 ---

@@ -13,8 +13,8 @@
 /// Both fields are atomic so parallel worker threads can increment without data races.
 typedef struct
 {
-    _Atomic (const char *) key;   ///< String literal key (pointer equality used for identity after first insertion).
-    _Atomic int64_t        value; ///< Current counter value.
+    _Atomic(const char *) key;   ///< String literal key (pointer equality used for identity after first insertion).
+    _Atomic int64_t       value; ///< Current counter value.
 } debug_entry_t;
 
 /// @brief Open-addressing hash table of named int64 debug counters.

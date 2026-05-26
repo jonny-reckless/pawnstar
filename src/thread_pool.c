@@ -5,10 +5,6 @@
 #include "thread_pool.h"
 
 /// @brief Entry point for each persistent pool thread.
-/// Loops indefinitely: blocks on work_ready, executes the assigned search_single_move() call,
-/// writes result_score, frees the worker search_state_t, then posts work_done.
-/// If the search is already cancelled on entry, SEARCH_CANCELLED_SCORE is returned immediately.
-/// Sets the shared cutoff flag when score >= beta so that sibling dispatches can abort early.
 /// Exits cleanly when slot->shutdown is true (set by thread_pool_destroy before posting work_ready).
 static int pool_thread_fn(void *arg)
 {
@@ -17,8 +13,9 @@ static int pool_thread_fn(void *arg)
     {
         sem_wait(&slot->work_ready);
         if (atomic_load_explicit(&slot->shutdown, memory_order_relaxed))
+        {
             break;
-
+        }
         slot->work.result_score = slot->fn(&slot->work);
         sem_post(&slot->work_done);
     }
@@ -75,7 +72,9 @@ void thread_pool_destroy(thread_pool_t *self)
 int thread_pool_try_acquire(thread_pool_t *self)
 {
     if (sem_trywait(&self->available) != 0)
+    {
         return -1;
+    }
     mtx_lock(&self->lock);
     int idx = self->free_stack[--self->free_count];
     mtx_unlock(&self->lock);

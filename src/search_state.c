@@ -8,7 +8,7 @@
 search_state_t *search_state_from_game(game_t *game)
 {
     search_state_t *ss = slice_allocator_alloc(&game->ss_pool);
-    int n = (int)(game->position - game->positions) + 1;
+    int             n  = (int)(game->position - game->positions) + 1;
     for (int i = 0; i < n; ++i)
     {
         ss->hash_stack[i] = (hash_stack_entry_t){game->positions[i].hash, game->positions[i].half_move_clock};
@@ -25,7 +25,7 @@ search_state_t *search_state_from_game(game_t *game)
 search_state_t *search_state_worker(const search_state_t *parent, atomic_bool *cutoff)
 {
     search_state_t *ss = slice_allocator_alloc(&parent->game->ss_pool);
-    ss->hash_len = parent->hash_len;
+    ss->hash_len       = parent->hash_len;
     memcpy(ss->hash_stack, parent->hash_stack, (size_t)parent->hash_len * sizeof(hash_stack_entry_t));
     ss->pos_stack[0] = parent->pos_stack[parent->pos_len - 1];
     ss->pos_len      = 1;

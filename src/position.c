@@ -403,8 +403,7 @@ void position_to_string(const position_t *pos, char *buf, size_t buf_size)
         }
     }
 
-    int written =
-        snprintf(p, (size_t)(end - p + 1), " %d %d", pos->half_move_clock, pos->move_counter + 1);
+    int written = snprintf(p, (size_t)(end - p + 1), " %d %d", pos->half_move_clock, pos->move_counter + 1);
     if (written > 0)
     {
         p += written;

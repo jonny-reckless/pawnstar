@@ -19,16 +19,16 @@
 /// @brief All state required to play and search a game of chess.
 typedef struct game
 {
-    transposition_table_t transposition_table;            ///< Main transposition table (64 MB default).
-    history_table_t       history_table;                  ///< History heuristic counts.
-    chess_clock_t         time_control;                   ///< Clock and time-control parameters.
-    opening_book_t        book;                           ///< Opening book.
-    int                   node_count;                     ///< Nodes visited during the current search.
-    atomic_bool           is_cancel_pending;              ///< Set by the UCI stop command; causes search to terminate.
-    thrd_t                worker_thread;                  ///< Background thread running the search.
-    bool                  worker_running;                 ///< True while worker_thread is alive and joinable.
-    thread_pool_t         thread_pool;                    ///< Persistent worker threads for parallel move search (NumCPU threads).
-    slice_allocator_t     ss_pool;                        ///< Slab pool for search_state_t allocation during search.
+    transposition_table_t transposition_table; ///< Main transposition table (64 MB default).
+    history_table_t       history_table;       ///< History heuristic counts.
+    chess_clock_t         time_control;        ///< Clock and time-control parameters.
+    opening_book_t        book;                ///< Opening book.
+    int                   node_count;          ///< Nodes visited during the current search.
+    atomic_bool           is_cancel_pending;   ///< Set by the UCI stop command; causes search to terminate.
+    thrd_t                worker_thread;       ///< Background thread running the search.
+    bool                  worker_running;      ///< True while worker_thread is alive and joinable.
+    thread_pool_t         thread_pool;         ///< Persistent worker threads for parallel move search (NumCPU threads).
+    slice_allocator_t     ss_pool;             ///< Slab pool for search_state_t allocation during search.
     position_t            positions[POSITION_STACK_SIZE]; ///< Position history stack (copy-make).
     position_t           *position;                       ///< Pointer to the current position (top of stack).
 } game_t;

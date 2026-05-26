@@ -1,6 +1,6 @@
 PROGRAM          = pawnstar
 CC               = clang
-CFLAGS           = -I include -D DEBUGX=1 -D _POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -std=c17 -mbmi2
+CFLAGS           = -I src -D DEBUGX=1 -D _POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -std=c17 -mbmi2
 BUILD_DIR        = build
 PROGRAM_EXE      = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA   = src/generated_data.c

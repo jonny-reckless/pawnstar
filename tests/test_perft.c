@@ -18,7 +18,9 @@ static uint64_t count_nodes(position_t *stack, int sp, int depth)
     position_t *pos = &stack[sp];
     move_list_t ml  = position_generate_legal_moves(pos);
     if (depth <= 1)
+    {
         return (uint64_t)ml.size;
+    }
     uint64_t n = 0;
     for (int i = 0; i < ml.size; ++i)
     {
@@ -32,7 +34,9 @@ int main(int argc, char *argv[])
 {
     int max_depth = 5;
     if (argc >= 2)
+    {
         max_depth = atoi(argv[1]);
+    }
 
     int     failures      = 0;
     int     total         = 0;
@@ -44,12 +48,16 @@ int main(int argc, char *argv[])
         const char *line = perft_results[r];
         const char *semi = strchr(line, ';');
         if (!semi)
+        {
             continue;
+        }
 
         char fen[256];
         int  fen_len = (int)(semi - line);
         if (fen_len >= (int)sizeof(fen))
+        {
             fen_len = (int)sizeof(fen) - 1;
+        }
         memcpy(fen, line, (size_t)fen_len);
         fen[fen_len] = '\0';
 

@@ -9,14 +9,16 @@
 /// All indices are available on entry; max_allocated starts at zero.
 void slice_allocator_init(slice_allocator_t *self, size_t object_size, int capacity)
 {
-    self->object_size = object_size;
-    self->capacity    = capacity;
-    self->pool        = malloc(object_size * (size_t)capacity);
-    self->free_list   = malloc(sizeof(int) * (size_t)capacity);
+    self->object_size   = object_size;
+    self->capacity      = capacity;
+    self->pool          = malloc(object_size * (size_t)capacity);
+    self->free_list     = malloc(sizeof(int) * (size_t)capacity);
     self->free_count    = capacity;
     self->max_allocated = 0;
     for (int i = 0; i < capacity; ++i)
+    {
         self->free_list[i] = i;
+    }
     mtx_init(&self->lock, mtx_plain);
 }
 
@@ -38,7 +40,9 @@ void *slice_allocator_alloc(slice_allocator_t *self)
     int idx       = self->free_list[--self->free_count];
     int allocated = self->capacity - self->free_count;
     if (allocated > self->max_allocated)
+    {
         self->max_allocated = allocated;
+    }
     mtx_unlock(&self->lock);
     return (char *)self->pool + (size_t)idx * self->object_size;
 }

@@ -11,9 +11,18 @@
 #include "search_state.h"
 #include "transposition_table.h"
 
-static inline int max_int(int a, int b) { return a > b ? a : b; }
-static inline int min_int(int a, int b) { return a < b ? a : b; }
-static inline int abs_int(int a)        { return a < 0 ? -a : a; }
+static inline int max_int(int a, int b)
+{
+    return a > b ? a : b;
+}
+static inline int min_int(int a, int b)
+{
+    return a < b ? a : b;
+}
+static inline int abs_int(int a)
+{
+    return a < 0 ? -a : a;
+}
 
 move_t search_root_node(game_t *game)
 {
@@ -25,8 +34,14 @@ move_t search_root_node(game_t *game)
     }
 
     move_list_t move_list = position_generate_legal_moves(game->position);
-    if (move_list.size == 0) return move_none();
-    if (move_list.size == 1) return move_list.items[0];
+    if (move_list.size == 0)
+    {
+        return move_none();
+    }
+    if (move_list.size == 1)
+    {
+        return move_list.items[0];
+    }
 
     // Plan time usage.
     int ms_timeout   = 0;
@@ -92,8 +107,8 @@ move_t search_root_node(game_t *game)
         }
 
         move_list_stable_sort(&move_list);
-        int alpha        = ALPHA;
-        ss->node_count   = 0;
+        int alpha      = ALPHA;
+        ss->node_count = 0;
         if (best_moves_n < MAX_PLY)
         {
             best_moves[best_moves_n++] = best_move;
@@ -122,13 +137,16 @@ move_t search_root_node(game_t *game)
                 for (int j = 0; j < principal_variation.size; ++j)
                 {
                     move_to_string(principal_variation.items[j], mv_buf, sizeof(mv_buf));
-                    int written = snprintf(pv_buf + pv_len, sizeof(pv_buf) - (size_t)pv_len,
-                                          j == 0 ? "%s" : " %s", mv_buf);
-                    if (written > 0) pv_len += written;
+                    int written =
+                        snprintf(pv_buf + pv_len, sizeof(pv_buf) - (size_t)pv_len, j == 0 ? "%s" : " %s", mv_buf);
+                    if (written > 0)
+                    {
+                        pv_len += written;
+                    }
                 }
                 printf("info depth %2d score cp %5d time %5lld nodes %8d pv %s\n", depth, alpha,
-                       (long long)(chess_clock_elapsed_milliseconds(&game->time_control) - start_ms),
-                       ss->node_count, pv_buf);
+                       (long long)(chess_clock_elapsed_milliseconds(&game->time_control) - start_ms), ss->node_count,
+                       pv_buf);
                 fflush(stdout);
             }
         }
@@ -148,9 +166,13 @@ move_t search_root_node(game_t *game)
             for (int k = 0; k < best_moves_n; ++k)
             {
                 if (!move_equals(best_moves[k], best_move))
+                {
                     is_best_move_consistent = false;
+                }
                 if (abs_int(move_score(best_moves[k]) - move_score(best_move)) > SCORE_INSTABILITY_THRESHOLD)
+                {
                     is_score_stable = false;
+                }
             }
 
             if (is_best_move_consistent && is_score_stable && (elapsed_ms * 4) > ms_allocated)

@@ -138,7 +138,7 @@ see_result_t evaluate_static_exchange(const position_t *src_position, move_t mov
 {
     position_t dst_position;
     position_make_move(&dst_position, src_position, move);
-    const bool is_checking  = position_is_in_check(&dst_position);
+    const bool is_checking = position_is_in_check(&dst_position);
 
     see_board_t bb;
     memcpy(&bb, &dst_position, sizeof(see_board_t));

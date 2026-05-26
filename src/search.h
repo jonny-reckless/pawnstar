@@ -48,8 +48,8 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
 /// @param pv          PV accumulator for the child variation.
 /// @param move_index  Zero-based index of this move in the ordered move list (0 = TT move).
 /// @return Child position's score negated to the parent's perspective.
-int search_single_move(search_state_t *ss, int depth, int ply, int alpha, int beta, move_t move,
-                       variation_t *pv, int move_index);
+int search_single_move(search_state_t *ss, int depth, int ply, int alpha, int beta, move_t move, variation_t *pv,
+                       int move_index);
 
 /// @brief Quiescence search: evaluates captures until a quiet (non-capturing) position is reached.
 /// The standing-pat heuristic returns the static evaluation if it already exceeds beta.
