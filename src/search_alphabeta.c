@@ -101,8 +101,10 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 
 /// @brief Dispatch @p n_moves remaining moves to pool worker threads and return the best scored move.
 /// Only called when beta == alpha+1 (null window) and ss_can_go_parallel() is true.
-static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves, int depth, int ply, int alpha,
-                                    int beta)
+/// @p skip_move is the TT move (already searched serially by the caller); matching moves are skipped.
+/// Pass move_none() when there is no TT move to skip.
+static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves, move_t skip_move,
+                                    int depth, int ply, int alpha, int beta)
 {
     INCREMENT("parallel searches");
 
@@ -113,14 +115,20 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     int            dispatched[MAX_MOVES_PER_POSITION];
     move_t         dispatched_moves[MAX_MOVES_PER_POSITION];
     int            n_dispatched = 0;
+    int            serial_from  = n_moves; // first index not dispatched; searched serially below
 
     for (int i = 0; i < n_moves; ++i)
     {
+        if (move_equals(moves[i], skip_move))
+            continue;
         if (atomic_load(&cutoff) || atomic_load_explicit(&ss->game->is_cancel_pending, memory_order_relaxed))
             break;
         int slot = thread_pool_try_acquire(pool);
         if (slot < 0)
+        {
+            serial_from = i; // pool exhausted; fall back to serial from here
             break;
+        }
         pool_work_t work = {search_state_worker(ss, &cutoff), moves[i], depth, ply, alpha, beta, ALPHA, &cutoff};
         thread_pool_dispatch(pool, slot, work);
         dispatched[n_dispatched]       = slot;
@@ -129,6 +137,7 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
         ++n_dispatched;
     }
 
+    // Collect all parallel results before the serial phase so workers don't race with ss.
     move_t best       = move_none();
     int    best_score = ALPHA;
     for (int i = 0; i < n_dispatched; ++i)
@@ -141,6 +150,25 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
             best       = move_with_score(dispatched_moves[i], best_score);
         }
     }
+
+    // Search any moves that couldn't be dispatched (pool was exhausted).
+    for (int i = serial_from; i < n_moves; ++i)
+    {
+        if (move_equals(moves[i], skip_move))
+            continue;
+        if (ss_is_cancelled(ss) || best_score >= beta)
+            break;
+        INCREMENT("parallel fallback serial");
+        variation_t pv;
+        variation_clear(&pv);
+        int score = search_single_move(ss, depth, ply, alpha, beta, moves[i], &pv, i);
+        if (score > best_score)
+        {
+            best_score = score;
+            best       = move_with_score(moves[i], best_score);
+        }
+    }
+
     return best;
 }
 
@@ -344,36 +372,26 @@ int search(search_state_t *ss, int depth, int ply, int alpha, int beta, variatio
         if (i > 1 && !ss_is_cancelled(ss) && beta == alpha + 1 && ss_can_go_parallel(ss, depth) &&
             i + 1 < move_list.size)
         {
-            move_t parallel_moves[MAX_MOVES_PER_POSITION];
-            int    n_parallel = 0;
-            for (int j = i + 1; j < move_list.size; ++j)
+            move_t skip       = has_transposition ? transposition.move : move_none();
+            int    n_parallel = move_list.size - i - 1;
+            move_t parallel_best =
+                search_moves_parallel(ss, &move_list.items[i + 1], n_parallel, skip, depth, ply, alpha, beta);
+            if (ss_is_cancelled(ss))
             {
-                if (!has_transposition || !move_equals(move_list.items[j], transposition.move))
-                {
-                    parallel_moves[n_parallel++] = move_list.items[j];
-                }
+                return SEARCH_CANCELLED_SCORE;
             }
-            if (n_parallel > 0)
+            int parallel_score = move_score(parallel_best);
+            if (parallel_score >= beta)
             {
-                move_t parallel_best = search_moves_parallel(ss, parallel_moves, n_parallel, depth, ply, alpha, beta);
-                if (ss_is_cancelled(ss))
-                {
-                    return SEARCH_CANCELLED_SCORE;
-                }
-                int parallel_score = move_score(parallel_best);
-                if (parallel_score >= beta)
-                {
-                    transposition_t rec = {
-                        position->hash, parallel_best, parallel_score, (int16_t)depth, (uint8_t)TRANSPOSITION_CUT,
-                        false};
-                    transposition_table_record(&ss->game->transposition_table, &rec);
-                    return parallel_score;
-                }
-                if (parallel_score > best_score)
-                {
-                    best_score = parallel_score;
-                    best_move  = parallel_best;
-                }
+                transposition_t rec = {
+                    position->hash, parallel_best, parallel_score, (int16_t)depth, (uint8_t)TRANSPOSITION_CUT, false};
+                transposition_table_record(&ss->game->transposition_table, &rec);
+                return parallel_score;
+            }
+            if (parallel_score > best_score)
+            {
+                best_score = parallel_score;
+                best_move  = parallel_best;
             }
             break; // parallel phase handled the rest
         }
