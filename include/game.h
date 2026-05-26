@@ -1,7 +1,6 @@
 #pragma once
 /// @file game_t: top-level game state owning all search infrastructure.
 
-#include <semaphore.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <threads.h>
@@ -11,6 +10,7 @@
 #include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
+#include "thread_pool.h"
 #include "transposition_table.h"
 
 #define POSITION_STACK_SIZE 256 ///< Maximum number of positions in the game history + search stack.
@@ -26,7 +26,7 @@ typedef struct game
     atomic_bool           is_cancel_pending;              ///< Set by the UCI stop command; causes search to terminate.
     thrd_t                worker_thread;                  ///< Background thread running the search.
     bool                  worker_running;                 ///< True while worker_thread is alive and joinable.
-    sem_t                 parallel_slots;                 ///< Semaphore controlling max parallel workers (capacity = NumCPU).
+    thread_pool_t         thread_pool;                    ///< Persistent worker threads for parallel move search (NumCPU threads).
     position_t            positions[POSITION_STACK_SIZE]; ///< Position history stack (copy-make).
     position_t           *position;                       ///< Pointer to the current position (top of stack).
 } game_t;

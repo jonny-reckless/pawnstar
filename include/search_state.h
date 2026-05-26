@@ -109,6 +109,6 @@ static inline bool ss_is_cancelled(const search_state_t *ss)
 static inline bool ss_can_go_parallel(const search_state_t *ss, int depth)
 {
     int val;
-    sem_getvalue(&ss->game->parallel_slots, &val);
+    sem_getvalue(&ss->game->thread_pool.available, &val);
     return ss->was_cutoff == NULL && depth >= 4 && val > 0;
 }

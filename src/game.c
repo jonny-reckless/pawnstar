@@ -37,7 +37,7 @@ void game_init(game_t *self)
     self->worker_running = false;
     int nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (nprocs < 1) nprocs = 1;
-    sem_init(&self->parallel_slots, 0, (unsigned)nprocs);
+    thread_pool_init(&self->thread_pool, nprocs);
     game_new_game_default(self);
 }
 
@@ -47,7 +47,7 @@ void game_free(game_t *self)
     transposition_table_free(&self->transposition_table);
     history_table_free(&self->history_table);
     opening_book_free(&self->book);
-    sem_destroy(&self->parallel_slots);
+    thread_pool_destroy(&self->thread_pool);
 }
 
 void game_new_game(game_t *self, const char *fen_string)

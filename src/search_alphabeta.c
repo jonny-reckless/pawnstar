@@ -1,7 +1,6 @@
 /// @file Alpha-beta search with Young Brothers Wait parallel dispatch.
 
-#include <stdlib.h>
-#include <threads.h>
+#include <stdatomic.h>
 
 #include "chess_clock.h"
 #include "debug_hashtable.h"
@@ -96,44 +95,7 @@ static inline int attempt_null_move(search_state_t *ss, int depth, int ply, int 
 // Young Brothers Wait parallel search
 // ---------------------------------------------------------------------------
 
-typedef struct
-{
-    search_state_t *ss;      // worker-owned search state (freed by worker)
-    move_t          move;
-    int             depth;
-    int             ply;
-    int             alpha;
-    int             beta;
-    int             result_score; // written by worker before sem_post
-    atomic_bool    *cutoff;
-} worker_arg_t;
-
-static int parallel_worker_fn(void *arg)
-{
-    worker_arg_t *a = arg;
-    int            score;
-    if (ss_is_cancelled(a->ss))
-    {
-        score = SEARCH_CANCELLED_SCORE;
-    }
-    else
-    {
-        variation_t pv;
-        variation_clear(&pv);
-        score = search_single_move(a->ss, a->depth, a->ply, a->alpha, a->beta, a->move, &pv, 0);
-        if (score >= a->beta)
-        {
-            INCREMENT("parallel cutoffs");
-            atomic_store(a->cutoff, true);
-        }
-    }
-    a->result_score = score;
-    sem_post(&a->ss->game->parallel_slots);
-    search_state_free(a->ss);
-    return 0;
-}
-
-/// @brief Dispatch @p n_moves remaining moves to parallel worker threads and return the best scored move.
+/// @brief Dispatch @p n_moves remaining moves to pool worker threads and return the best scored move.
 /// Only called when beta == alpha+1 (null window) and ss_can_go_parallel() is true.
 static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int n_moves,
                                     int depth, int ply, int alpha, int beta)
@@ -143,54 +105,38 @@ static move_t search_moves_parallel(search_state_t *ss, const move_t *moves, int
     atomic_bool cutoff;
     atomic_init(&cutoff, false);
 
-    // Allocate per-worker state on the heap; size bounded by n_moves but usually much smaller.
-    thrd_t       *threads = malloc((size_t)n_moves * sizeof(thrd_t));
-    worker_arg_t *args    = malloc((size_t)n_moves * sizeof(worker_arg_t));
-    int           n_spawned = 0;
+    thread_pool_t *pool = &ss->game->thread_pool;
+    int            dispatched[MAX_MOVES_PER_POSITION];
+    move_t         dispatched_moves[MAX_MOVES_PER_POSITION];
+    int            n_dispatched = 0;
 
     for (int i = 0; i < n_moves; ++i)
     {
         if (atomic_load(&cutoff) || atomic_load_explicit(&ss->game->is_cancel_pending, memory_order_relaxed))
-        {
             break;
-        }
-        // Non-blocking slot acquisition: skip if no workers available rather than blocking.
-        if (sem_trywait(&ss->game->parallel_slots) != 0)
-        {
+        int slot = thread_pool_try_acquire(pool);
+        if (slot < 0)
             break;
-        }
-        args[n_spawned] = (worker_arg_t){
-            search_state_worker(ss, &cutoff),
-            moves[i], depth, ply, alpha, beta, ALPHA, &cutoff};
-        if (thrd_create(&threads[n_spawned], parallel_worker_fn, &args[n_spawned]) != thrd_success)
-        {
-            // Thread creation failed: release the slot we already acquired.
-            sem_post(&ss->game->parallel_slots);
-            search_state_free(args[n_spawned].ss);
-            break;
-        }
+        pool_work_t work = {search_state_worker(ss, &cutoff), moves[i], depth, ply, alpha, beta, ALPHA, &cutoff};
+        thread_pool_dispatch(pool, slot, work);
+        dispatched[n_dispatched]       = slot;
+        dispatched_moves[n_dispatched] = moves[i];
         INCREMENT("parallel moves searched");
-        ++n_spawned;
+        ++n_dispatched;
     }
 
-    for (int i = 0; i < n_spawned; ++i)
-    {
-        thrd_join(threads[i], NULL);
-    }
-
-    move_t best      = move_none();
+    move_t best       = move_none();
     int    best_score = ALPHA;
-    for (int i = 0; i < n_spawned; ++i)
+    for (int i = 0; i < n_dispatched; ++i)
     {
-        if (args[i].result_score > best_score)
+        int score = thread_pool_collect(pool, dispatched[i]);
+        thread_pool_release(pool, dispatched[i]);
+        if (score > best_score)
         {
-            best_score = args[i].result_score;
-            best       = move_with_score(args[i].move, best_score);
+            best_score = score;
+            best       = move_with_score(dispatched_moves[i], best_score);
         }
     }
-
-    free(threads);
-    free(args);
     return best;
 }
 
