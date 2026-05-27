@@ -8,7 +8,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "search_state.h"
 #include "transposition_table.h"
 
 /// @brief Centipawn values for each piece type indexed by piece_t (NONE through KING).
@@ -41,8 +40,7 @@ void game_init(game_t *self)
     {
         num_cpus = 1;
     }
-    thread_pool_init(&self->thread_pool, num_cpus);
-    slice_allocator_init(&self->ss_pool, sizeof(search_state_t), NUM_ALLOCATOR_SLICES);
+    self->n_helpers = num_cpus - 1;
     game_new_game_default(self);
 }
 
@@ -52,8 +50,6 @@ void game_free(game_t *self)
     transposition_table_free(&self->transposition_table);
     history_table_free(&self->history_table);
     opening_book_free(&self->book);
-    thread_pool_destroy(&self->thread_pool);
-    slice_allocator_destroy(&self->ss_pool);
 }
 
 void game_new_game(game_t *self, const char *fen_string)

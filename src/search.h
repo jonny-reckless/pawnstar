@@ -16,7 +16,7 @@
 /// @return The best move found, or move_none() if the position has no legal moves.
 move_t search_root_node(game_t *game);
 
-/// @brief Negamax alpha-beta search with PVS, null-move pruning, LMR, and YBW parallelism.
+/// @brief Negamax alpha-beta search with PVS, null-move pruning, and LMR.
 /// All scores are from the perspective of the side to move (negamax convention).
 /// The transposition table is consulted before move generation; a matching entry at sufficient
 /// depth may return immediately (CUT/ALL nodes) or extend the search by one ply (PV nodes).
@@ -24,8 +24,6 @@ move_t search_root_node(game_t *game);
 /// material advantage and is not in the endgame.  LMR reduces quiet non-pawn moves at
 /// null-window nodes after the 4th move (−1 ply), 7th move (−2 ply), and 7th move with zero
 /// history count (−3 ply); reductions are re-searched at full depth if they raise alpha.
-/// After 3 serial moves at a null-window node (depth ≥ 4), remaining moves are dispatched to
-/// the thread pool (Young Brothers Wait); see search_moves_parallel().
 /// @param ss          Per-thread search state (position stack, hash stack, node counter).
 /// @param depth       Remaining depth in plies; may become negative in quiescence.
 /// @param ply         Distance from the root; used for mate-distance scores and TT indexing.

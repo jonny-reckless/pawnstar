@@ -1,6 +1,7 @@
-/// @file Iterative-deepening root search.
+/// @file Iterative-deepening root search with Lazy SMP helper threads.
 
 #include <stdio.h>
+#include <threads.h>
 
 #include "chess_clock.h"
 #include "debug_hashtable.h"
@@ -23,6 +24,34 @@ static inline int abs_int(int a)
 {
     return a < 0 ? -a : a;
 }
+
+// ---------------------------------------------------------------------------
+// Lazy SMP helper thread
+// ---------------------------------------------------------------------------
+
+/// @brief Entry point for each Lazy SMP helper thread.
+/// Runs iterative deepening from START_DEPTH until the search is cancelled.
+/// Shares the transposition table with the main thread; contributes TT entries
+/// that improve the main thread's move ordering and pruning.
+static int lazy_helper_fn(void *arg)
+{
+    game_t         *game = arg;
+    search_state_t *ss   = search_state_from_game(game);
+    variation_t     pv;
+    for (int depth = START_DEPTH; !ss_is_cancelled(ss); ++depth)
+    {
+        variation_clear(&pv);
+        search(ss, depth, 0, ALPHA, BETA, &pv);
+    }
+    search_state_free(ss);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Root search
+// ---------------------------------------------------------------------------
+
+#define MAX_HELPERS 64
 
 move_t search_root_node(game_t *game)
 {
@@ -80,6 +109,15 @@ move_t search_root_node(game_t *game)
     history_table_reset(&game->history_table);
     transposition_table_age(&game->transposition_table);
 
+    // Start Lazy SMP helper threads.  Each helper independently searches from
+    // the root, populating the shared TT to improve the main thread's pruning.
+    int    n_helpers = game->n_helpers < MAX_HELPERS ? game->n_helpers : MAX_HELPERS;
+    thrd_t helpers[MAX_HELPERS];
+    for (int i = 0; i < n_helpers; ++i)
+    {
+        thrd_create(&helpers[i], lazy_helper_fn, game);
+    }
+
     search_state_t *ss = search_state_from_game(game);
 
     variation_t principal_variation;
@@ -122,8 +160,7 @@ move_t search_root_node(game_t *game)
             move_assign_score(&move_list.items[i], score);
             if (atomic_load_explicit(&game->is_cancel_pending, memory_order_relaxed))
             {
-                search_state_free(ss);
-                return best_move;
+                goto done;
             }
             if (score > alpha)
             {
@@ -193,6 +230,14 @@ move_t search_root_node(game_t *game)
                 break;
             }
         }
+    }
+
+done:
+    // Signal helpers to stop and wait for them to exit.
+    atomic_store(&game->is_cancel_pending, true);
+    for (int i = 0; i < n_helpers; ++i)
+    {
+        thrd_join(helpers[i], NULL);
     }
 
     search_state_free(ss);

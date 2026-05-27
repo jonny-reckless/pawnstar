@@ -29,8 +29,6 @@ LIB_SOURCES = \
 	search_quiescent.c \
 	search_root_node.c \
 	search_state.c \
-	slice_allocator.c \
-	thread_pool.c \
 	static_exchange_evaluation.c \
 	transposition_table.c \
 	$(notdir $(GENERATED_DATA))
@@ -57,7 +55,7 @@ prep:
 
 clean:
 	rm -f $(PROGRAM_EXE) $(LIB) $(LIB_OBJECTS) $(MAIN_OBJECTS) $(DEPS) $(GENERATED_DATA) $(GENERATOR_EXE)
-	rm -rf $(TEST_BUILD_DIR) $(BUILD_DIR)
+	rm -rf $(TEST_BUILD_DIR) $(BUILD_DIR) build-serial
 
 # ─── Main build ──────────────────────────────────────────────────────────────
 $(BUILD_DIR)/%.o: src/%.c | prep

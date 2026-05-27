@@ -118,16 +118,16 @@ Pin detection ([src/pins.h](src/pins.h)) computes pin rays and absolute-pin mask
 `game_t` ([src/game.h](src/game.h)) owns all shared search infrastructure:
 
 - Transposition table (64 MB, 24-byte entries, direct-mapped by `hash % size`; access serialized by 256 stripe mutexes indexed `table_index & 255`)
-- History heuristic table: `_Atomic uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`, accumulated with relaxed atomics so parallel workers update it safely
-- Thread pool: NumCPU persistent threads, each blocked on a per-slot POSIX semaphore until dispatched; `sem_t available` counts idle slots for non-blocking `sem_trywait` probes; each dispatch carries a `pool_fn_t` function pointer so the pool is decoupled from search logic
+- History heuristic table: `_Atomic uint32_t counts[MAX_PLY × 4096]`, indexed by `(ply, from+to)`, accumulated with relaxed atomics so Lazy SMP helper threads update it safely
 - Opening book indexed by Zobrist hash
 - Chess clock and time-control parameters
 - Position history stack (`position_t positions[256]`) for the current game line
 - `atomic_bool is_cancel_pending` — set by UCI `stop` or time expiry; polled by all search threads
+- `n_helpers` — number of Lazy SMP helper threads (physical CPUs − 1)
 
 Search runs on a background `thrd_t` so the UCI `stop` command can interrupt it without blocking.
 
-`search_state_t` ([src/search_state.h](src/search_state.h)) is per-thread state: a copy-make `pos_stack` seeded at the fork point (so workers never touch the main game stack), a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions — cheap to copy when forking workers), a node counter, and a shared pointer to `game_t`. `search_state_t` objects are allocated from a dedicated slab pool ([src/slice_allocator.h](src/slice_allocator.h)) so allocation is O(1) and lock-contention is confined to the pool's mutex rather than the system allocator.
+`search_state_t` ([src/search_state.h](src/search_state.h)) is per-thread state: a copy-make `pos_stack` seeded from the game's current position at thread creation, a compact `hash_stack` of `{hash, half_move_clock}` entries for repetition detection (16 bytes × n vs 160 bytes × n for full positions), a node counter, and a shared pointer to `game_t`. Allocated with `malloc`; freed after the thread's search completes.
 
 The search ([src/search_root_node.c](src/search_root_node.c), [src/search_alphabeta.c](src/search_alphabeta.c), [src/search_quiescent.c](src/search_quiescent.c)):
 
@@ -139,9 +139,9 @@ The search ([src/search_root_node.c](src/search_root_node.c), [src/search_alphab
 - **Check extension**: +1 ply when the side to move is in check.
 - **Promotion extension**: +1 ply on pawn-promotion moves.
 - **Quiescence search** on captures only; positions in check fall back to a full `search()` call so every legal reply is considered. Standing-pat (static evaluation as a lower bound) is applied before generating captures.
-- **Young Brothers Wait (YBW)**: after 3 serial moves at a null-window node with depth ≥ 4, remaining moves are dispatched to thread-pool workers. Each dispatch claims an idle slot via non-blocking `sem_trywait`; stops if none are free. Each worker gets its own fork of the `search_state_t` (pos_stack + hash_stack seeded from the parent's current position) and writes to a shared `atomic_bool cutoff` on beta cutoff. Workers never spawn sub-workers. The main thread collects all results before continuing.
+- **Lazy SMP**: at the start of each search, `n_helpers` background threads are spawned (one per physical CPU minus one for the main thread). Each helper independently runs the same iterative-deepening loop from the root, sharing only the transposition table. TT races between threads cause natural divergence in move ordering; the helper threads populate TT entries that the main thread exploits for better pruning. When the main thread finishes or is cancelled, it sets `is_cancel_pending` and joins all helpers.
 
-Move ordering: transposition-table move first (searched serially before the full move list is generated), then MVV-LVA (victim value × 10000 − attacker value × 1000) combined with the history heuristic count.
+Move ordering: transposition-table move first (searched serially before the full move list is generated), then MVV-LVA (victim value × 1000 − attacker value × 100) combined with the history heuristic count.
 
 ### Evaluation
 
