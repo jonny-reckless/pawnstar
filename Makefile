@@ -17,6 +17,10 @@ ifeq ($(SERIAL), 1)
 	CFLAGS += -D DO_PARALLEL_SEARCH=0
 endif
 
+ifdef N_HELPERS
+	CFLAGS += -D N_HELPERS_OVERRIDE=$(N_HELPERS)
+endif
+
 # ─── Engine static library ────────────────────────────────────────────────────
 # Excludes main.c and input_handling.c (entry point and UCI command loop).
 LIB_SOURCES = \

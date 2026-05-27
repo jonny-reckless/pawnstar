@@ -70,10 +70,12 @@ typedef struct
 } pv_helper_arg_t;
 
 /// @brief Entry point for the PV-leaf helper thread.
-/// Waits for the main thread to publish a PV, plays out all PV moves on a fresh
-/// search_state_t to advance to the leaf position, then runs iterative deepening
-/// from there.  When a newer PV is published the current search is abandoned and
-/// the helper restarts from the new leaf.  Exits when is_cancel_pending is set.
+/// Waits for the main thread to publish a PV, then validates and plays out PV moves
+/// on a fresh search_state_t: each move is checked against the legal move set before
+/// being applied so that a stale or race-corrupted PV cannot produce an illegal
+/// position.  After advancing to the (possibly truncated) leaf, runs iterative
+/// deepening from there.  When a newer PV is published the current search is abandoned
+/// and the helper restarts from the new leaf.  Exits when is_cancel_pending is set.
 static int lazy_pv_helper_fn(void *arg)
 {
     pv_helper_arg_t *pv_arg   = arg;
@@ -103,9 +105,25 @@ static int lazy_pv_helper_fn(void *arg)
         ss = search_state_from_game(game);
 
         // Advance to the PV leaf by playing out every move in the PV.
+        // Validate each move against the legal move set: a stale or corrupted PV
+        // move could leave the position illegal, so stop at the first bad move.
         int pv_ply = 0;
         for (int i = 0; i < pv.size && !ss_is_cancelled(ss); ++i)
         {
+            move_list_t legal = position_generate_legal_moves(ss_current_position(ss));
+            bool        found = false;
+            for (int j = 0; j < legal.size; ++j)
+            {
+                if (move_equals(legal.items[j], pv.items[i]))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                break;
+            }
             ss_play_move(ss, pv.items[i]);
             ++pv_ply;
         }

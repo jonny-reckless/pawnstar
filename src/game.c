@@ -40,7 +40,11 @@ void game_init(game_t *self)
     {
         num_cpus = 1;
     }
+#ifdef N_HELPERS_OVERRIDE
+    self->n_helpers = N_HELPERS_OVERRIDE;
+#else
     self->n_helpers = num_cpus - 1;
+#endif
     game_new_game_default(self);
 }
 
