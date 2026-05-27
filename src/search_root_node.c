@@ -1,6 +1,7 @@
 /// @file Iterative-deepening root search with Lazy SMP helper threads.
 
 #include <stdio.h>
+#include <string.h>
 #include <threads.h>
 
 #include "chess_clock.h"
@@ -26,10 +27,10 @@ static inline int abs_int(int a)
 }
 
 // ---------------------------------------------------------------------------
-// Lazy SMP helper thread
+// Lazy SMP helper thread (root search)
 // ---------------------------------------------------------------------------
 
-/// @brief Entry point for each Lazy SMP helper thread.
+/// @brief Entry point for standard Lazy SMP helper threads.
 /// Runs iterative deepening from START_DEPTH until the search is cancelled.
 /// Shares the transposition table with the main thread; contributes TT entries
 /// that improve the main thread's move ordering and pruning.
@@ -44,6 +45,84 @@ static int lazy_helper_fn(void *arg)
         search(ss, depth, 0, ALPHA, BETA, &pv);
     }
     search_state_free(ss);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// PV-leaf helper thread
+// ---------------------------------------------------------------------------
+
+/// @brief Shared state between the main thread and the PV-leaf helper.
+/// The main thread writes @c pv then bumps @c generation with memory_order_release
+/// after each completed depth.  The helper reads @c generation with
+/// memory_order_acquire, then snapshots @c pv.
+typedef struct
+{
+    game_t     *game;
+    atomic_int  generation; ///< 0 = no PV yet; incremented after each depth.
+    variation_t pv;         ///< Current best PV; written before bumping generation.
+} pv_helper_arg_t;
+
+/// @brief Entry point for the PV-leaf helper thread.
+/// Waits for the main thread to publish a PV, plays out all PV moves on a fresh
+/// search_state_t to advance to the leaf position, then runs iterative deepening
+/// from there.  When a newer PV is published the current search is abandoned and
+/// the helper restarts from the new leaf.  Exits when is_cancel_pending is set.
+static int lazy_pv_helper_fn(void *arg)
+{
+    pv_helper_arg_t *pv_arg  = arg;
+    game_t          *game    = pv_arg->game;
+    search_state_t  *ss      = NULL;
+    int              last_gen = 0;
+
+    while (!atomic_load_explicit(&game->is_cancel_pending, memory_order_relaxed))
+    {
+        int gen = atomic_load_explicit(&pv_arg->generation, memory_order_acquire);
+        if (gen == last_gen)
+        {
+            thrd_yield();
+            continue;
+        }
+        last_gen = gen;
+
+        // Snapshot the PV published by the main thread.
+        variation_t pv;
+        memcpy(&pv, &pv_arg->pv, sizeof(variation_t));
+
+        // Re-initialise search state from the game root.
+        if (ss != NULL)
+        {
+            search_state_free(ss);
+        }
+        ss = search_state_from_game(game);
+
+        // Advance to the PV leaf by playing out every move in the PV.
+        int pv_ply = 0;
+        for (int i = 0; i < pv.size && !ss_is_cancelled(ss); ++i)
+        {
+            ss_play_move(ss, pv.items[i]);
+            ++pv_ply;
+        }
+
+        // Search from the leaf at increasing depths.
+        // pv_ply is passed as the ply argument so that mate-distance scores are
+        // measured from the game root rather than the leaf.
+        for (int depth = 1; !ss_is_cancelled(ss); ++depth)
+        {
+            if (atomic_load_explicit(&pv_arg->generation, memory_order_relaxed) != last_gen)
+            {
+                break; // newer PV available — restart from the updated leaf
+            }
+            variation_t child_pv;
+            variation_clear(&child_pv);
+            search(ss, depth, pv_ply, ALPHA, BETA, &child_pv);
+        }
+    }
+
+    if (ss != NULL)
+    {
+        search_state_free(ss);
+    }
     return 0;
 }
 
@@ -109,9 +188,23 @@ move_t search_root_node(game_t *game)
     history_table_reset(&game->history_table);
     transposition_table_age(&game->transposition_table);
 
-    // Start Lazy SMP helper threads.  Each helper independently searches from
-    // the root, populating the shared TT to improve the main thread's pruning.
-    int    n_helpers = game->n_helpers < MAX_HELPERS ? game->n_helpers : MAX_HELPERS;
+    // Allocate one helper slot for PV-leaf searching; the rest do root-level Lazy SMP.
+    int n_helpers = game->n_helpers < MAX_HELPERS ? game->n_helpers : MAX_HELPERS;
+
+    pv_helper_arg_t pv_arg;
+    pv_arg.game = game;
+    atomic_init(&pv_arg.generation, 0);
+    variation_clear(&pv_arg.pv);
+
+    thrd_t pv_helper;
+    int    n_pv_helpers = 0;
+    if (n_helpers > 0)
+    {
+        thrd_create(&pv_helper, lazy_pv_helper_fn, &pv_arg);
+        n_pv_helpers = 1;
+        n_helpers--;
+    }
+
     thrd_t helpers[MAX_HELPERS];
     for (int i = 0; i < n_helpers; ++i)
     {
@@ -188,6 +281,13 @@ move_t search_root_node(game_t *game)
             }
         }
 
+        // Publish the completed-depth PV to the PV-leaf helper thread.
+        if (n_pv_helpers > 0 && principal_variation.size > 0)
+        {
+            memcpy(&pv_arg.pv, &principal_variation, sizeof(variation_t));
+            atomic_fetch_add_explicit(&pv_arg.generation, 1, memory_order_release);
+        }
+
         int stop_ms = (int)chess_clock_elapsed_milliseconds(&game->time_control);
         if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
         {
@@ -235,6 +335,10 @@ move_t search_root_node(game_t *game)
 done:
     // Signal helpers to stop and wait for them to exit.
     atomic_store(&game->is_cancel_pending, true);
+    if (n_pv_helpers > 0)
+    {
+        thrd_join(pv_helper, NULL);
+    }
     for (int i = 0; i < n_helpers; ++i)
     {
         thrd_join(helpers[i], NULL);
