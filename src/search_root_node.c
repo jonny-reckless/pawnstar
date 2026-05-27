@@ -13,6 +13,10 @@
 #include "search_state.h"
 #include "transposition_table.h"
 
+#ifndef DO_PARALLEL_SEARCH
+#define DO_PARALLEL_SEARCH 1
+#endif
+
 static inline int max_int(int a, int b)
 {
     return a > b ? a : b;
@@ -25,6 +29,8 @@ static inline int abs_int(int a)
 {
     return a < 0 ? -a : a;
 }
+
+#if DO_PARALLEL_SEARCH
 
 // ---------------------------------------------------------------------------
 // Lazy SMP helper thread (root search)
@@ -70,9 +76,9 @@ typedef struct
 /// the helper restarts from the new leaf.  Exits when is_cancel_pending is set.
 static int lazy_pv_helper_fn(void *arg)
 {
-    pv_helper_arg_t *pv_arg  = arg;
-    game_t          *game    = pv_arg->game;
-    search_state_t  *ss      = NULL;
+    pv_helper_arg_t *pv_arg   = arg;
+    game_t          *game     = pv_arg->game;
+    search_state_t  *ss       = NULL;
     int              last_gen = 0;
 
     while (!atomic_load_explicit(&game->is_cancel_pending, memory_order_relaxed))
@@ -126,11 +132,13 @@ static int lazy_pv_helper_fn(void *arg)
     return 0;
 }
 
+#define MAX_HELPERS 64
+
+#endif // DO_PARALLEL_SEARCH
+
 // ---------------------------------------------------------------------------
 // Root search
 // ---------------------------------------------------------------------------
-
-#define MAX_HELPERS 64
 
 move_t search_root_node(game_t *game)
 {
@@ -188,6 +196,7 @@ move_t search_root_node(game_t *game)
     history_table_reset(&game->history_table);
     transposition_table_age(&game->transposition_table);
 
+#if DO_PARALLEL_SEARCH
     // Allocate one helper slot for PV-leaf searching; the rest do root-level Lazy SMP.
     int n_helpers = game->n_helpers < MAX_HELPERS ? game->n_helpers : MAX_HELPERS;
 
@@ -210,6 +219,7 @@ move_t search_root_node(game_t *game)
     {
         thrd_create(&helpers[i], lazy_helper_fn, game);
     }
+#endif
 
     search_state_t *ss = search_state_from_game(game);
 
@@ -281,12 +291,14 @@ move_t search_root_node(game_t *game)
             }
         }
 
+#if DO_PARALLEL_SEARCH
         // Publish the completed-depth PV to the PV-leaf helper thread.
         if (n_pv_helpers > 0 && principal_variation.size > 0)
         {
             memcpy(&pv_arg.pv, &principal_variation, sizeof(variation_t));
             atomic_fetch_add_explicit(&pv_arg.generation, 1, memory_order_release);
         }
+#endif
 
         int stop_ms = (int)chess_clock_elapsed_milliseconds(&game->time_control);
         if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
@@ -335,6 +347,7 @@ move_t search_root_node(game_t *game)
 done:
     // Signal helpers to stop and wait for them to exit.
     atomic_store(&game->is_cancel_pending, true);
+#if DO_PARALLEL_SEARCH
     if (n_pv_helpers > 0)
     {
         thrd_join(pv_helper, NULL);
@@ -343,6 +356,7 @@ done:
     {
         thrd_join(helpers[i], NULL);
     }
+#endif
 
     search_state_free(ss);
     return best_move;

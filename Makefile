@@ -13,6 +13,10 @@ else
 	CFLAGS += -g -O3
 endif
 
+ifeq ($(SERIAL), 1)
+	CFLAGS += -D DO_PARALLEL_SEARCH=0
+endif
+
 # ─── Engine static library ────────────────────────────────────────────────────
 # Excludes main.c and input_handling.c (entry point and UCI command loop).
 LIB_SOURCES = \
